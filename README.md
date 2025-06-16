@@ -7,8 +7,6 @@
   <img src="https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
 </p>
   
-Testings
-
 A self-hosted, multi-user workout logging application built entirely with SQLPage. This application allows users to track their workouts against predefined templates, follow progression models, log their performance, and view their history.
 
 ---
