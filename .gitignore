@@ -1,5 +1,19 @@
-# Ignore the data directory entirely
-data/
+# macOS system files
+.DS_Store
 
-# Ignore Python virtual environments
+# Database files - DO NOT COMMIT these to version control
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup folders
+/backups/
+
+# Python virtual environment folders
 .venv/
+__pycache__/
+
+# Generated report/documentation folders
+# You can uncomment these lines if you don't want to track the generated reports
+# /docs/
+# /reports/
