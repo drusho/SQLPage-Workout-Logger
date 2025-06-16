@@ -1,23 +1,27 @@
 ---
 date: 2025-06-15
 title: "SQLPage - Workout - SQL Comment Documentation"
+summary: "A guide to docstring conventions and a summary of all documented SQL files in the project."
+series: sqlpage.workout-logger
+github: https://github.com/drusho/SQLPage-Workout-Logger
+source: "/Volumes/Public/Container_Settings/sqlpage"
+categories: Homelab
 tags:
   - sqlpage
   - documentation
   - style-guide
-series: sqlpage.workout-logger
-categories: Homelab
 cssclasses:
   - academia
-  - academia-rounded
-source: "/Volumes/Public/Container_Settings/sqlpage"
-summary: "A guide to docstring conventions and a summary of all documented SQL files in the project."
+  - academia-rounded  
 ---
 >[!tip]+ Tip
 > - This report was auto-generated using the `SQLPage_Workout_Documentation_Generator.ipynb` notebook.
 
 ## Table of Contents
 
+- [`action_add_exercise.sql`](#action_add_exercisesql)
+- [`action_delete_exercise.sql`](#action_delete_exercisesql)
+- [`action_edit_exercise.sql`](#action_edit_exercisesql)
 - [`action_save_workout.sql`](#action_save_workoutsql)
 - [`action_update_profile.sql`](#action_update_profilesql)
 - [`auth_login_action.sql`](#auth_login_actionsql)
@@ -36,6 +40,86 @@ summary: "A guide to docstring conventions and a summary of all documented SQL f
 - [`view_progression_models.sql`](#view_progression_modelssql)
 - [`view_workout_logs.sql`](#view_workout_logssql)
 ## SQL File Documentation
+
+---
+### `action_add_exercise.sql`
+**Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_add_exercise.sql`
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
+
+**Description:** Displays a form to create a new entry in the `ExerciseLibrary` table and processes the form submission.
+
+**Requires:**
+- `../layouts/layout_main.sql` for the page shell and authentication.
+- The `ExerciseLibrary` table, which this script reads from (for dropdowns) and writes to.
+
+**Parameters:**
+- action [form] A hidden parameter with the value 'add_exercise' to trigger the INSERT statement.
+- name [form] The name of the new exercise.
+- alias [form, optional] An optional alias for the new exercise.
+- body_group [form, optional] The body group for the new exercise, selected from a dropdown.
+- equipment [form, optional] The equipment needed for the new exercise.
+
+**Returns:**
+- On successful submission, a `redirect` component that sends the user back to the main exercise list. Otherwise, returns a UI page with a `form`.
+
+**See Also:**
+- `view_exercises.sql` - The page that links to this one and to which this page redirects.
+
+**Notes:**
+- This page is self-submitting and uses the Post-Redirect-Get (PRG) pattern.
+
+**TODO:**
+- Add server-side validation to prevent creating exercises with duplicate names.
+
+---
+### `action_delete_exercise.sql`
+**Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_delete_exercise.sql`
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
+
+**Description:** Displays a confirmation form to prevent accidental deletion of an exercise. Processes the soft-delete action upon confirmation.
+
+**Requires:**
+- `../layouts/layout_main.sql` for the page shell.
+- The `ExerciseLibrary` table, which this script reads from and updates.
+
+**Parameters:**
+- $id [url] The `ExerciseID` of the record to be deleted.
+- action [form] A hidden parameter with the value 'delete_exercise' to trigger the UPDATE statement.
+- id [form] A hidden parameter containing the ExerciseID to delete.
+- confirmation [form] The user-typed exercise name, required to confirm the deletion.
+
+**Returns:**
+- On successful submission, a `redirect` component. Otherwise, returns a UI page with the confirmation form.
+
+**See Also:**
+- `view_exercises.sql` - The page that links to this delete page.
+
+**Notes:**
+- This performs a "soft delete" by setting `IsEnabled = 0`, not a hard `DELETE` from the database.
+
+---
+### `action_edit_exercise.sql`
+**Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_edit_exercise.sql`
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
+
+**Description:** Displays a form pre-filled with data for a specific exercise from the `ExerciseLibrary` table.
+
+**Requires:**
+- `layouts/layout_main.sql` for the page shell and authentication.
+- The `ExerciseLibrary` table, which this script reads from to populate the form.
+
+**Parameters:**
+- $id [url] The `ExerciseID` of the record to be edited, passed in the URL.
+
+**Returns:**
+- A UI page containing a form pre-filled with the data for the specified exercise.
+
+**See Also:**
+- `view_exercises.sql` - The page that links to this edit page.
+- `../actions/action_edit_exercise.sql` - The script that processes this form's submission.
+
+**Notes:**
+- The form fields are pre-populated using a separate, direct database query for each field.
 
 ---
 ### `action_save_workout.sql`
@@ -362,25 +446,22 @@ summary: "A guide to docstring conventions and a summary of all documented SQL f
 **Path:** `/Volumes/Public/Container_Settings/sqlpage/www/views/view_exercises.sql`
 **Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
 
-**Description:** A management page for the Exercise Library. It displays all exercises in a table, provides a form to add new custom exercises, and includes links to delete existing ones. This script serves as both the view and its own form handler for add/delete actions.
+**Description:** Displays a list of all enabled exercises from the `ExerciseLibrary`. This is the main page for exercise management.
 
 **Requires:**
 - `layouts/layout_main.sql` for the page shell and authentication.
-- The `ExerciseLibrary` table, which this page reads from and writes to.
-
-**Parameters:**
-- delete_id [url, optional] The ID of an exercise to be deleted.
-- new_exercise_name [form, optional] The name of a new custom exercise to add.
+- The `ExerciseLibrary` table to populate the list.
 
 **Returns:**
-- A full UI page containing a form and a table. If an action parameter is provided (`delete_id` or `new_exercise_name`), it returns a `redirect` component instead to reload the page with fresh data.
+- A UI page containing a button to add new exercises and a table listing all existing exercises.
+
+**See Also:**
+- `/actions/action_add_exercise.sql` - Page for creating new exercises.
+- `/actions/action_edit_exercise.sql` - Page for editing an existing exercise.
+- `/actions/action_delete_exercise.sql` - Page for confirming the deletion of an exercise.
 
 **Notes:**
-- This page uses the Post-Redirect-Get (PRG) pattern. When an action is submitted, it processes the request and then issues a redirect to itself. This prevents duplicate form submissions if the user refreshes the page.
-
-**TODO:**
-- Expand the "Add New Exercise" form to include all relevant fields from the `ExerciseLibrary` table (e.g., Body Group, Equipment Type).
-- Add an "Edit" button or link for each exercise to allow modification of existing entries.
+- This page links to other pages for specific actions (add, edit, delete), following a multi-page application pattern.
 
 ---
 ### `view_history.sql`

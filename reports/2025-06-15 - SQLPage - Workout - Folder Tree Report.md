@@ -1,15 +1,18 @@
 ---
 date: 2025-06-15
 title: "SQLPage - Workout - Folder Tree Report"
+summary: "An ASCII tree representation of the file and folder structure for the SQLPage - Workout project."
+series: sqlpage.workout-logger
+github: https://github.com/drusho/SQLPage-Workout-Logger
+source: "/Volumes/Public/Container_Settings/sqlpage"
+categories: Homelab
 tags:
   - sqlpage
-series: sqlpage.workout-logger
-categories: Homelab
+  - workout
 cssclasses:
   - academia
   - academia-rounded
-source: "/Volumes/Public/Container_Settings/sqlpage"
-summary: "An ASCII tree representation of the file and folder structure for the SQLPage - Workout project."
+
 ---
 >[!tip]+ Tip
 > - This report was auto-generated using the `SQLPage_Workout_Documentation_Generator.ipynb` notebook.
@@ -32,6 +35,9 @@ sqlpage/
 │   └── 2025-06-15 - SQLPage - Workout - SQL Comment Documentation.md
 └── www
     ├── actions
+    │   ├── action_add_exercise.sql
+    │   ├── action_delete_exercise.sql
+    │   ├── action_edit_exercise.sql
     │   ├── action_save_workout.sql
     │   └── action_update_profile.sql
     ├── auth

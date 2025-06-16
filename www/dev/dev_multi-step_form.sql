@@ -16,23 +16,23 @@
  * component may fail if the `example` table does not exist.
  */
 
-select 'dynamic' as component,
-    properties
-FROM example
-WHERE component = 'shell'
-LIMIT 1;
-select 'text' as component,
-    '
-# SQLPage Multi-Step Form Example
+-- select 'dynamic' as component,
+--     properties
+-- FROM example
+-- WHERE component = 'shell'
+-- LIMIT 1;
+-- select 'text' as component,
+--     '
+-- # SQLPage Multi-Step Form Example
 
-The example below demonstrates how to build complex multi-step forms using the [form](/documentation.sql?component=form#component) component.
-In this example, the list of cities is taken from a dynamic database table,
-and each step of the form is shown conditionally based on the previous step.
-The form has a variable number of fields: after the number of adults and children are selected,
-a field is shown for each passenger to enter their name.
+-- The example below demonstrates how to build complex multi-step forms using the [form](/documentation.sql?component=form#component) component.
+-- In this example, the list of cities is taken from a dynamic database table,
+-- and each step of the form is shown conditionally based on the previous step.
+-- The form has a variable number of fields: after the number of adults and children are selected,
+-- a field is shown for each passenger to enter their name.
 
-See [the SQL source on GitHub](https://github.com/sqlpage/SQLPage/blob/main/examples/official-site/examples/multistep-form) for the full code.
-' as contents_md;
+-- See [the SQL source on GitHub](https://github.com/sqlpage/SQLPage/blob/main/examples/official-site/examples/multistep-form) for the full code.
+-- ' as contents_md;
 create temporary table if not exists cities as
 select 1 as id,
     'Cairo' as city

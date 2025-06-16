@@ -64,7 +64,7 @@ SELECT 'shell' as component,
                 'link',
                 '/index.sql',
                 'icon',
-                'home'
+                'clipboard-text' 
             ),
             json_object(
                 'title',
@@ -72,7 +72,7 @@ SELECT 'shell' as component,
                 'link',
                 '/views/view_exercises.sql',
                 'icon',
-                'weight'
+                'book' 
             ),
             json_object(
                 'title',
@@ -80,7 +80,7 @@ SELECT 'shell' as component,
                 'link',
                 '/views/view_history.sql',
                 'icon',
-                'edit'
+                'history' 
             ),
             json_object(
                 'title',
@@ -96,7 +96,7 @@ SELECT 'shell' as component,
                 'link',
                 '/profile.sql',
                 'icon',
-                'person'
+                'user-circle' 
             ),
             json_object(
                 'title',
@@ -104,7 +104,7 @@ SELECT 'shell' as component,
                 'link',
                 '/auth/auth_logout.sql',
                 'icon',
-                'log-out'
+                'logout'
             )
         ) -- Otherwise, show the guest menu.
         ELSE json_array(
@@ -114,7 +114,7 @@ SELECT 'shell' as component,
                 'link',
                 '/auth/auth_login_form.sql',
                 'icon',
-                'log-in'
+                'login'
             ),
             json_object(
                 'title',
