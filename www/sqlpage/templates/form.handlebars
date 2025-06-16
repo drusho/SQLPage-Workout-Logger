@@ -1,0 +1,185 @@
+<form 
+    {{#if id}}id="{{id}}"{{/if}}
+    class="mt-3 mb-1 {{class}}"
+    method="{{default method "post"}}"
+    {{#if enctype}}enctype="{{enctype}}"{{/if}}
+    {{#if action}}action="{{action}}"
+    {{else}}
+    {{#if id}}action="#{{id}}"{{/if}}
+    {{/if}}
+    {{#if auto_submit}}data-auto-submit{{/if}}
+>
+    <fieldset class="form-fieldset mb-1">
+        {{#if title}}
+            <h2 class="text-center mb-0">{{title}}</h2>
+        {{/if}}
+        <div class="row">
+            {{#each_row}}
+            {{#if (eq type "header")}}
+                <h3 class="text-center mt-2 mb-1"{{#if id}} id="{{id}}"{{/if}}>{{label}}</h3>
+            {{else}}
+            {{#if (or (eq type "radio") (eq type "checkbox"))}}
+                <div class="form-selectgroup form-selectgroup-boxes d-flex flex-column mx-0 my-1 col-md-{{default width 12}}">
+                    <label class="form-selectgroup-item flex-fill mx-0">
+                        <input type="{{type}}" {{#if id}}id="{{id}}" {{/if}}name="{{name}}" value="{{value}}" {{#if required}}required{{/if}} {{#if checked}}checked{{/if}} class="form-selectgroup-input">
+                        <div class="form-selectgroup-label d-flex align-items-center p-3">
+                            <div class="me-3">
+                                <span class="form-selectgroup-check"></span>
+                            </div>
+                            <div>
+                                {{default label value}}
+                                {{~#if required}}
+                                    <span class="text-danger ms-1" aria-label="required" title="required">*</span>
+                                {{/if}}
+                                {{#if description}}
+                                    <small class="form-hint mt-0">{{description}}</small>
+                                {{/if}}
+                                {{#if description_md}}
+                                    <small class="form-hint mt-0">{{{markdown description_md}}}</small>
+                                {{/if}}
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            {{else}}
+            {{~#if (eq type "switch")}}
+                <div class="form-selectgroup form-selectgroup-boxes d-flex flex-column mx-0 my-1 col-md-{{default width 12}}">
+                    <label class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" {{#if id}}id="{{id}}" {{/if}}name="{{name}}" value="{{value}}"{{#if required}} required{{/if}}{{#if checked}} checked{{/if}}{{#if disabled}} disabled{{/if~}}/>
+                        <span class="form-check-label">
+                                {{default label value}}
+                                {{~#if required}}
+                                    <span class="text-danger ms-1" aria-label="required" title="required">*</span>
+                                {{/if}}
+                                {{#if description}}
+                                    <small class="form-hint mt-0">{{description}}</small>
+                                {{/if}}
+                                {{#if description_md}}
+                                    <small class="form-hint mt-0">{{{markdown description_md}}}</small>
+                                {{/if}}
+                        </span>
+                    </label>
+                </div>
+            {{else}}
+            {{~#if (eq type "hidden")}}
+                <input type="hidden" name="{{name}}" {{#if id}}id="{{id}}" {{/if}}value="{{value}}">
+            {{else}}
+                <label class="form-label mb-2 col-md-{{default width 12}}">
+                    {{~default label name~}}
+                    {{~#if required}}
+                        <span class="text-danger ms-1" aria-label="required" title="required">*</span>
+                        {{/if}}
+                    {{~#if (eq type 'textarea')~}}
+                        <textarea
+                            name="{{name}}"
+                            class="form-control {{class}}"
+                            placeholder="{{placeholder}}"
+                            rows="{{default rows 3}}"
+                            {{#if id}}id="{{id}}" {{/if~}}
+                            {{~#if value includeZero=true}}value="{{value}}" {{/if~}}
+                            {{~#if minlength}}minlength="{{minlength}}" {{/if~}}
+                            {{~#if maxlength}}maxlength="{{maxlength}}" {{/if~}}
+                            {{~#if required}}required="required" {{/if~}}
+                            {{~#if autofocus}}autofocus {{/if~}}
+                            {{~#if disabled}}disabled {{/if~}}
+                            {{~#if readonly}}readonly {{/if~}}
+                        >
+                        {{~#if value includeZero=true}}{{value}}{{/if~}}
+                        </textarea>
+                    {{~else~}}{{#if (eq type 'select')~}}
+                        <select name="{{name}}" 
+                            class="form-select {{class}}"
+                        {{~#if id}} id="{{id}}" {{/if~}}
+                        {{~#if required}} required="required" {{/if~}}
+                        {{~#if autofocus}} autofocus {{/if~}}
+                        {{~#if disabled}}disabled {{/if~}}
+                        {{~#if multiple}} multiple {{/if~}}
+                        {{~#if (or dropdown searchable options_source)}} 
+                            data-pre-init="select-dropdown"
+                            data-sqlpage-js="{{static_path 'tomselect.js'}}"
+                        {{/if~}}
+                        {{~#if options_source}} data-options_source="{{options_source}}" {{/if~}}
+                        {{~#if placeholder}} placeholder="{{placeholder}}" {{/if~}}
+                        {{~#if create_new}} data-create_new={{create_new}} {{/if~}}
+                        >
+                        {{#if empty_option}}<option value="">{{empty_option}}</option>{{/if}}
+                        {{#each (parse_json options)}}
+                            <option value="{{value}}" {{#if (or (eq ../value value) selected)}}selected{{/if}}>{{label}}</option>
+                        {{/each}}
+                        </select>
+                    {{else}}
+                        <div class="input-group">
+                            {{#if prefix_icon}}<span class="input-group-text">{{icon_img prefix_icon}}</span>{{/if}}
+                            {{#if prefix}}<span class="input-group-text">{{prefix}}</span>{{/if}}
+                            <input name="{{name}}" class="form-control {{class}}" 
+                                {{~#if id}} id="{{id}}" {{/if~}}
+                                {{~#if type}} type="{{type}}" {{/if~}}
+                                {{~#if placeholder includeZero=true}} placeholder="{{placeholder}}" {{/if~}}
+                                {{~#if value includeZero=true}} value="{{value}}" {{/if~}}
+                                {{~#if (or max (eq max 0))}} max="{{max}}" {{/if~}}
+                                {{~#if (or min (eq min 0))}} min="{{min}}" {{/if~}}
+                                {{~#if step}} step="{{step}}" {{/if~}}
+                                {{~#if minlength}} minlength="{{minlength}}" {{/if~}}
+                                {{~#if maxlength}} maxlength="{{maxlength}}" {{/if~}}
+                                {{~#if pattern}} pattern="{{pattern}}" {{/if~}}
+                                {{~#if required}} required="required" {{/if~}}
+                                {{~#if (or (eq autocomplete false) (eq autocomplete 0))}}autocomplete="off" {{/if~}}
+                                {{~#if (or (eq autocomplete true) (eq autocomplete 1))}}autocomplete="on" {{/if~}}
+                                {{~#if (gt (len autocomplete) 1)}}autocomplete="{{autocomplete}}" {{/if~}}
+                                {{~#if formaction}}formaction="{{formaction}}" {{/if~}}
+                                {{~#if formenctype}}formenctype="{{formenctype}}" {{/if~}}
+                                {{~#if formmethod}}formmethod="{{formmethod}}" {{/if~}}
+                                {{~#if formnovalidate}}formnovalidate="{{formnovalidate}}" {{/if~}}
+                                {{~#if formtarget}}formtarget="{{formtarget}}" {{/if~}}
+                                {{~#if list}}list="{{list}}" {{/if~}}
+                                {{~#if multiple}}multiple="{{multiple}}" {{/if~}}
+                                {{~#if accept}}accept="{{accept}}" {{/if~}}
+                                {{~#if autofocus}}autofocus {{/if~}}
+                                {{~#if disabled}}disabled {{/if~}}
+                                {{~#if readonly}}readonly {{/if~}}
+                                {{~#if (eq type "file")}}
+                                    data-max-size="{{app_config "max_uploaded_file_size"}}"
+                                {{/if~}}
+                            />
+                            {{#if suffix}}<span class="input-group-text">{{suffix}}</span>{{/if}}
+                        </div>
+                    {{/if}}
+                    {{/if}}
+                    {{~#if description~}}
+                        <small class="form-hint mt-0">{{description}}</small>
+                    {{~/if~}}
+                    {{~#if description_md~}}
+                        <small class="form-hint mt-0">{{{markdown description_md}}}</small>
+                    {{~/if~}}
+                </label>
+            {{~/if~}}
+            {{/if}}
+            {{/if}}
+            {{/if}}
+            {{#if (eq type "file")}}
+                <!-- Change the form encoding type if this is a file input-->
+                {{#delay}}formenctype="multipart/form-data"{{/delay}}
+            {{/if}}
+        {{/each_row}}
+        </div>
+        {{#if (and (ne validate '') (not auto_submit))}}
+            <input class="btn
+            btn-{{default validate_color "primary"}}
+            {{#if validate_shape}} btn-{{validate_shape}} {{/if}}
+            {{#if validate_outline}} btn-outline-{{validate_outline}} {{/if}}
+            {{#if validate_size}} btn-{{validate_size}} {{/if}}"
+            {{flush_delayed}}
+            type="submit"
+            {{#if validate}}value="{{validate}}"{{/if}}>
+        {{/if}}
+        {{#if reset}}
+            <input class="btn 
+            {{#if reset_color}} btn-{{reset_color}} {{/if}}
+            {{#if reset_shape}} btn-{{reset_shape}} {{/if}}
+            {{#if reset_outline}} btn-outline-{{reset_outline}} {{/if}}
+            {{#if reset_size}} btn-{{reset_size}} {{/if}}"
+            type="reset" 
+            value="{{reset}}">
+        {{/if}}
+    </fieldset>
+</form>
