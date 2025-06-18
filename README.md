@@ -19,6 +19,17 @@ A self-hosted, multi-user workout logging application built entirely with SQLPag
 - **Workout History:** View and search past workout performance.
 - **Template-Based Workouts:** Create and reuse workout templates for structured and efficient sessions.
 
+### Screenshots
+**Home Page**
+![home-page](/Volumes/Public/Container_Settings/sqlpage/assets/2025-06-18-exercise-library.png)
+
+**Exercise Library**
+![exercises-page](/Volumes/Public/Container_Settings/sqlpage/assets/2025-06-18-exercise-library.png)
+
+**Workouts**
+![workouts](/Volumes/Public/Container_Settings/sqlpage/assets/2025-06-18-workouts.png)
+
+
 ---
 
 ## Technology Stack
