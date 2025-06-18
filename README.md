@@ -20,15 +20,26 @@ A self-hosted, multi-user workout logging application built entirely with SQLPag
 - **Template-Based Workouts:** Create and reuse workout templates for structured and efficient sessions.
 
 ### Screenshots
-**Home Page**
-![home-page](/Volumes/Public/Container_Settings/sqlpage/assets/2025-06-18-exercise-library.png)
+<details open>
+<summary>Home Page</summary>
 
-**Exercise Library**
-![exercises-page](/Volumes/Public/Container_Settings/sqlpage/assets/2025-06-18-exercise-library.png)
+![home-page](https://github.com/drusho/SQLPage-Workout-Logger/blob/master/assets/2025-06-18-home-page.png?raw=true)
 
-**Workouts**
-![workouts](/Volumes/Public/Container_Settings/sqlpage/assets/2025-06-18-workouts.png)
+</details>
 
+<details open>
+<summary>Exercise Library</summary>
+
+![exercises-page](https://github.com/drusho/SQLPage-Workout-Logger/blob/master/assets/2025-06-18-exercise-library.png?raw=true)
+
+</details>
+
+<details open>
+<summary>Workouts</summary>
+
+![workouts](https://github.com/drusho/SQLPage-Workout-Logger/blob/master/assets/2025-06-18-workouts.png?raw=true)
+
+</details>
 
 ---
 
