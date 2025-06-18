@@ -1,36 +1,25 @@
 /**
  * @filename      index.sql
- * @description   The main application dashboard, functioning as a multi-step, self-reloading
- * form to guide the user through logging a workout. It conditionally displays
- * information based on user selections: first templates, then exercises with
- * progression targets, and finally a detailed logging form for a specific exercise.
+ * @description   The main application dashboard for logging a workout. This is a multi-step,
+ * self-reloading form that uses the new database views to display progression
+ * targets and a dynamic, multi-set form for logging.
  * @created       2025-06-14
- * @last-updated  2025-06-15 16:58:42 MDT
- * @requires      - `layouts/layout_main.sql` for the page shell and authentication.
- * @requires      - The `sessions` table to identify the current user.
- * @requires      - All tables related to templates and progression: `WorkoutTemplates`,
- * `TemplateExerciseList`, `ExerciseLibrary`, `UserExerciseProgression`,
- * and `ProgressionModelSteps`.
- * @param         sqlpage.cookie('session_token') [cookie] Used to identify the current user.
- * @param         template_id [url, optional] The ID of the currently selected workout template.
- * Controls the display of the exercise list and selector.
- * @param         selected_exercise_id [url, optional] The ID of the chosen exercise. Controls
- * the display of the final workout logging form.
- * @returns       A full UI page that progressively reveals more components as the user makes
- * selections. The final state includes selectors and the detailed logging form.
- * @see           - `action_save_workout.sql` - The script that the final logging form submits to.
- * @note          - This page heavily uses auto-submitting forms and conditional rendering to
- * create a dynamic, single-page application experience.
- * @note          - The progression targets shown in the exercise list and pre-filled into the
- * final form are calculated with complex, multi-table joins.
- * @todo          - Refactor the complex progression-target queries into a single database
- * `VIEW` to simplify the SQL in this file and reduce redundancy.
- * @todo          - Add more graceful handling for cases where a user has no progression data
- * for a selected exercise, preventing potential errors or empty fields.
+ * @last-updated  2025-06-17
+ * @requires      - `layouts/layout_main.sql` for the page shell.
+ * @requires      - `views/UserExerciseProgressionTargets` VIEW for target calculations.
+ * @requires      - `views/WorkoutTemplateDetails` VIEW for listing exercises.
+ * @param         template_id [url, optional] The ID of the selected workout template.
+ * @param         selected_exercise_id [url, optional] The ID of the chosen exercise to log.
+ * @returns       A full UI page that progressively reveals more components as the user makes selections.
+ * @see           - `actions/action_save_workout.sql` - The script that the new multi-set form will submit to.
+ * @note          This page uses a progressive disclosure UI. The workout logging form (Step 6)
+ * is hidden until an exercise is selected in Step 5.
+ * @note          The target data query is now robust, providing default values if no pre-existing
+ * progression is found for a user on a given exercise.
+ * and `WorkoutSetLog` tables.
  */
 ----------------------------------------------------
--- STEP 1: First, get the current user's username into a variable.
--- $current_user
+-- STEP 1: Get the current user's username into a variable.
 ----------------------------------------------------
 SET current_user = (
         SELECT username
@@ -39,15 +28,12 @@ SET current_user = (
     );
 ------------------------------------------------------
 -- STEP 2: Include the main application layout and authentication check.
--- This command runs 'layout_main.sql' which contains the navigation menu and
--- the site-wide security check to ensure the user is logged in.
 ------------------------------------------------------
 SELECT 'dynamic' AS component,
     sqlpage.run_sql('layouts/layout_main.sql') AS properties;
 ------------------------------------------------------
 -- STEP 3: Display the Workout Template selection dropdown.
--- This form allows the user to choose a workout plan. It is configured to
--- automatically submit (and reload the page) as soon as a selection is made.
+-- This form allows the user to choose a workout plan. It auto-submits on change.
 ------------------------------------------------------
 SELECT 'form' as component,
     'index.sql' as action,
@@ -56,187 +42,134 @@ SELECT 'select' as type,
     'template_id' as name,
     'Workout Template' as label,
     'Select a workout' as empty_option,
-    true as searchable,
+    3 as width,
+    TRUE as searchable,
     :template_id as value,
+    -- Use json_group_array to build options from the WorkoutTemplates table
     json_group_array(
         json_object('value', TemplateID, 'label', TemplateName)
     ) as options
-FROM WorkoutTemplates;
-------------------------------------------------------
--- STEP 4: Display the list of exercises for the selected template.
--- This section only appears after a template has been chosen. It dynamically
--- builds an HTML list of exercises, showing the user's current targeted
--- sets, reps, and weight based on their progression model.
-------------------------------------------------------
+FROM WorkoutTemplates
+WHERE IsEnabled = 1;
+----------------------------------------------------
+-- STEP 4: Display a compact, foldable list of exercises and their targets.
+-- This section appears after a template is chosen and uses an HTML component
+-- for a mobile-friendly layout. It uses the database VIEWs to simplify data fetching.
+----------------------------------------------------
 SELECT 'html' as component;
-SELECT -- This CASE statement keeps the exercise list open until an exercise is selected.
-    '<details ' || CASE
-        WHEN :selected_exercise_id IS NULL THEN 'open'
-        ELSE ''
-    END || '>
-        <summary>Exercises</summary>
-        <div style="margin-top: 1rem; padding-left: 1rem; line-height: 1.5;">' || (
-        SELECT COALESCE(
-                group_concat(
-                    CASE
-                        WHEN uep.UserID IS NULL THEN lib.ExerciseAlias || ' - <small>No past workouts yet.</small>'
-                        ELSE lib.ExerciseAlias || ' - <b>' || IFNULL(pms.TargetSetsFormula, '?') || 'x' || CASE
-                            WHEN pms.RepsType = 'FIXED' THEN CAST(pms.RepsValue AS INTEGER)
-                            WHEN pms.RepsType = 'AMRAP' THEN 'AMRAP'
-                            WHEN pms.RepsType = 'PERCENT_OF_MAX' THEN CAST(
-                                MAX(1, ROUND(IFNULL(uep.MaxReps, 5) * pms.RepsValue)) AS INTEGER
-                            )
-                            ELSE '?'
-                        END || '</b>' || CASE
-                            WHEN lib.DefaultLogType != 'RepsOnly' THEN ' @ ' || ROUND(
-                                IFNULL(uep.CurrentCycle1RMEstimate, 0) * IFNULL(pms.TargetWeightPercentage, 0),
-                                2
-                            ) || ' lbs'
-                            ELSE ' reps'
-                        END || ' <small>(Step ' || IFNULL(uep.CurrentStepNumber, '?') || ')</small>'
-                    END,
-                    '<br>'
-                ),
-                'No exercises found in this template.'
-            )
-        FROM TemplateExerciseList AS tel
-            JOIN ExerciseLibrary AS lib ON tel.ExerciseID = lib.ExerciseID
-            LEFT JOIN UserExerciseProgression AS uep ON tel.ExerciseID = uep.ExerciseID
-            AND uep.UserID = $current_user
-            LEFT JOIN ProgressionModelSteps AS pms ON tel.ProgressionModelID = pms.ProgressionModelID
-            AND uep.CurrentStepNumber = pms.StepNumber
-        WHERE tel.TemplateID = :template_id
-    ) || '</div>
-    </details>' as html
-WHERE :template_id IS NOT NULL;
+SELECT '<details open><summary>Today''s Workout Targets</summary><div style="margin-top: 0.5rem; padding-left: 1rem; line-height: 1.7;">' || group_concat(
+        format(
+            '%s. %s<br><small> &nbsp; &rarr; Target: %s x %s @ %s lbs</small>',
+            wtd.OrderInWorkout,
+            wtd.ExerciseName,
+            pt.TargetSetsFormula,
+            pt.TargetRepsFormula,
+            pt.TargetWeight
+        ),
+        '<br>'
+    ) || '</div></details>' as html
+FROM WorkoutTemplateDetails wtd
+    JOIN UserExerciseProgressionTargets pt ON wtd.ExerciseID = pt.ExerciseID
+    AND pt.UserID = $current_user
+WHERE wtd.TemplateID = :template_id
+    and :template_id IS NOT NULL;
 ------------------------------------------------------
 -- STEP 5: Display the "Select an Exercise" dropdown.
--- This form allows the user to pick one exercise from the list to log.
--- It also auto-submits, reloading the page to show the logging form below.
+-- This form appears after a template is chosen. Selecting an exercise reveals the logging form below.
 ------------------------------------------------------
 SELECT 'form' as component,
     'index.sql' as action,
     'true' as auto_submit
 WHERE :template_id IS NOT NULL;
+-- A hidden field is included to persist the template_id between selections.
+SELECT 'hidden' as type,
+    'template_id' as name,
+    :template_id as value;
 SELECT 'select' as type,
     'selected_exercise_id' as name,
-    'Exercise' as label,
+    'Log Exercise' as label,
     'Choose an exercise to log...' as empty_option,
-    true as searchable,
     :selected_exercise_id as value,
+    3 as width,
+    -- Use the WorkoutTemplateDetails view to simplify this query
     json_group_array(
-        json_object('value', ExerciseID, 'label', ExerciseAlias)
+        json_object('value', ExerciseID, 'label', ExerciseName)
     ) as options
-FROM TemplateExerciseList
-WHERE TemplateID = :template_id;
+FROM WorkoutTemplateDetails
+WHERE TemplateID = :template_id
+    and :template_id IS NOT NULL;
 ------------------------------------------------------
--- STEP 6: Display the final workout logging form.
--- This form only appears after a user has selected an exercise. It is
--- pre-filled with the day's targeted workout values and submits the
--- user's actual performance to 'action_save_workout.sql'.
+-- STEP 6: Display the dynamic, multi-set workout logging form.
+-- All components in this step are conditionally rendered, appearing only after an
+-- exercise is selected in Step 5.
 ------------------------------------------------------
+-- The main form component. This acts as the master switch for the entire logging UI.
 SELECT 'form' as component,
-    'action_save_workout.sql' as action,
+    'actions/action_save_workout.sql' as action,
     'Log Workout' as validate,
     'green' as validate_color,
     'post' as method
 WHERE :selected_exercise_id IS NOT NULL;
+-- Get the target workout data, providing default values if no progression exists.
+-- This robust query ensures the form always has data to display.
+SET target = (
+        SELECT json_object(
+                'TargetRepsFormula',
+                TargetRepsFormula,
+                'TargetWeight',
+                TargetWeight,
+                'TargetSetsFormula',
+                TargetSetsFormula
+            )
+        FROM UserExerciseProgressionTargets
+        WHERE UserID = $current_user
+            AND ExerciseID = :selected_exercise_id
+    );
+-- Hidden fields to pass necessary IDs to the action script
 SELECT 'hidden' as type,
     'template_id' as name,
     :template_id as value;
 SELECT 'hidden' as type,
     'exercise_id' as name,
     :selected_exercise_id as value;
--- The 'Sets' input field
-SELECT 'number' as type,
-    'sets_recorded' as name,
-    'Sets' as label,
-    2 as width,
-    2 as maxlength,
-    10 as max,
-    (
-        SELECT TargetSetsFormula
-        FROM ProgressionModelSteps
-        WHERE ProgressionModelStepID = (
-                SELECT pms.ProgressionModelStepID
-                FROM TemplateExerciseList tel
-                    JOIN UserExerciseProgression uep ON tel.ExerciseID = uep.ExerciseID
-                    JOIN ProgressionModelSteps pms ON uep.ProgressionModelID = pms.ProgressionModelID
-                    AND uep.CurrentStepNumber = pms.StepNumber
-                WHERE tel.ExerciseID = :selected_exercise_id
-                    AND uep.UserID = $current_user
-            )
-    ) as value
-WHERE :selected_exercise_id IS NOT NULL;
--- The 'Reps' input field
-SELECT 'number' as type,
-    'reps_recorded' as name,
-    'Reps' as label,
-    2 as width,
-    25 as max,
-    2 as maxlength,
-    (
-        SELECT CASE
-                WHEN pms.RepsType = 'FIXED' THEN CAST(pms.RepsValue AS INTEGER)
-                WHEN pms.RepsType = 'AMRAP' THEN 'AMRAP'
-                WHEN pms.RepsType = 'PERCENT_OF_MAX' THEN CAST(
-                    MAX(1, ROUND(IFNULL(uep.MaxReps, 5) * pms.RepsValue)) AS INTEGER
-                )
-                ELSE '?'
-            END
-        FROM TemplateExerciseList tel
-            JOIN UserExerciseProgression uep ON tel.ExerciseID = uep.ExerciseID
-            JOIN ProgressionModelSteps pms ON uep.ProgressionModelID = pms.ProgressionModelID
-            AND uep.CurrentStepNumber = pms.StepNumber
-        WHERE tel.ExerciseID = :selected_exercise_id
-            AND uep.UserID = $current_user
-    ) as value
-WHERE :selected_exercise_id IS NOT NULL;
--- The 'Weight' input field with conditional integer formatting.
-SELECT 'number' as type,
-    'weight_recorded' as name,
-    'Weight (lbs)' as label,
-    2 as width,
-    (
-        WITH weight_calc AS (
-            SELECT CASE
-                    WHEN lib.DefaultLogType != 'RepsOnly' THEN ROUND(
-                        IFNULL(uep.CurrentCycle1RMEstimate, 0) * IFNULL(pms.TargetWeightPercentage, 0),
-                        2
-                    )
-                    ELSE 0
-                END as calculated_val
-            FROM TemplateExerciseList tel
-                JOIN UserExerciseProgression uep ON tel.ExerciseID = uep.ExerciseID
-                JOIN ProgressionModelSteps pms ON uep.ProgressionModelID = pms.ProgressionModelID
-                AND uep.CurrentStepNumber = pms.StepNumber
-                JOIN ExerciseLibrary lib ON tel.ExerciseID = lib.ExerciseID
-            WHERE tel.ExerciseID = :selected_exercise_id
-                AND uep.UserID = $current_user
+-- Pass the number of sets to the action script so it knows how many fields to process
+SELECT 'hidden' as type,
+    'num_sets' as name,
+    json_extract($target, '$.TargetSetsFormula') as value;
+-- Dynamically generate input rows for each set using a recursive CTE.
+-- The 'dynamic' component creates a set of Reps and Weight inputs for each number in the series.
+WITH RECURSIVE series(set_number) AS (
+    SELECT 1
+    UNION ALL
+    SELECT set_number + 1
+    FROM series
+    WHERE set_number < CAST(
+            json_extract($target, '$.TargetSetsFormula') AS INTEGER
         )
-        SELECT CASE
-                WHEN wc.calculated_val = CAST(wc.calculated_val AS INTEGER) THEN CAST(wc.calculated_val AS INTEGER)
-                ELSE wc.calculated_val
-            END
-        FROM weight_calc AS wc
-    ) as value
-WHERE :selected_exercise_id IS NOT NULL;
--- The 'RPE' input field
+)
+SELECT 'number' as type,
+    'Set ' || set_number as label,
+    --     set_number as description,
+    -- Use description to pass the raw number (1, 2, 3...)
+    'reps' as prefix,
+    json_extract($target, '$.TargetRepsFormula') as value,
+    2 as width
+FROM series;
+SELECT 'number' as type,
+    'weight_' || $description as name,
+    'Weight' as label,
+    json_extract($target, '$.TargetWeight') as value,
+    2 as width;
+-- Standard RPE and Notes fields, placed correctly after the list definition, inside the form.
 SELECT 'number' as type,
     'rpe_recorded' as name,
-    'RPE' as label,
-    2 as width,
+    'RPE (Overall)' as label,
     8 as value,
     0.5 as step,
-    1 as min,
-    10 as max
-WHERE :selected_exercise_id IS NOT NULL;
--- The 'Notes' text area
+    10 as max,
+    2 as width;
 SELECT 'textarea' as type,
     'notes_recorded' as name,
-    'Notes' as label,
-    12 as width,
-    'Add any exercise notes...' as placeholder
+    'Workout Notes' as label,
+    12 as width
 WHERE :selected_exercise_id IS NOT NULL;
--- This new button submits the form in the background.
-SELECT 'button' as component;

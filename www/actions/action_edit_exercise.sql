@@ -51,7 +51,7 @@ SELECT 'text' as component,
 SELECT 'form' as component,
     'action_edit_exercise.sql' as action,
     'post' as method,
-    'yellow' as validate_outline,
+    'green' as validate_color,
     'Update Exercise' as validate,
     'Clear' as reset;
 -- Define hidden fields to pass the 'action' and the 'id' to the processing script.
@@ -99,7 +99,9 @@ SELECT 'select' as type,
 FROM ExerciseLibrary
 WHERE ExerciseID = $id;
 -- Define a standalone 'Cancel' button that links back to the main exercise list.
-SELECT 'button' as component,
-    'outline' as style;
+SELECT 'button' as component;
+-- 'outline' as style;
 SELECT 'Cancel' as title,
-    '/views/view_exercises.sql' as link;
+    '/views/view_exercises.sql' as link,
+    'cancel' as icon,
+    'yellow' as outline;

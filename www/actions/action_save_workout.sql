@@ -1,128 +1,69 @@
 /**
  * @filename      action_save_workout.sql
- * @description   Processes and saves a completed workout set from a form submission. It first
- * inserts a new record into the `WorkoutLog` table, then updates or creates a
- * record in `UserExerciseProgression` to advance the user's progress for that exercise.
- * @created       2025-06-14
- * @last-updated  2025-06-15
- * @requires      - The `sessions` table to identify the current user.
- * @requires      - The `WorkoutLog` table for inserting new workout data.
- * @requires      - The `UserExerciseProgression` table to update the user's progress.
- * @requires      - The `ExerciseLibrary` table to check the exercise's log type.
- * @requires      - The `TemplateExerciseList` table to find the associated progression model.
- * @param         sqlpage.cookie('session_token') [cookie] The user's session identifier.
- * @param         exercise_id [form] The unique ID of the exercise being logged.
- * @param         template_id [form] The unique ID of the parent workout template.
- * @param         sets_recorded [form] The total number of sets performed.
- * @param         reps_recorded [form] Reps performed for a standard weighted exercise.
- * @param         weight_recorded [form] Weight used for a standard weighted exercise.
- * @param         reps_set_1 - reps_set_5 [form] Reps for 'RepsOnly' type exercises.
- * @param         rpe_recorded [form] The Rate of Perceived Exertion for the workout.
- * @param         notes_recorded [form, optional] User-provided notes for the log.
- * @returns       A `redirect` component that sends the user back to the main workout page for
- * the current template.
- * @see           - `index.sql` - The page where the workout form is displayed.
- * @see           - `views/view_workout_logs.sql` - A page that displays data saved by this script.
- * @todo          - Implement more complex progression logic based on `ProgressionModels` table.
- * @todo          - Add validation for required form parameters to prevent SQL errors.
- * @todo          - The 1RM estimation formula is hardcoded; consider making it dynamic.
+ * @description   Processes a multi-set workout form submission from index.sql. It first creates
+ * a single parent entry in the `WorkoutLog` table, then saves each submitted
+ * set individually into the `WorkoutSetLog` table, and finally updates the user's
+ * progression record to advance them to the next step.
+ * @created       2025-06-17
+ * @last-updated  2025-06-18
+ * @requires      - The `WorkoutLog` and `WorkoutSetLog` tables for saving workout data.
+ * @requires      - The `UserExerciseProgression` table to track and update user progress.
+ * @param         template_id [form] The ID of the parent workout template.
+ * @param         exercise_id [form] The ID of the exercise being logged.
+ * @param         num_sets [form] The total number of sets submitted from the form.
+ * @param         reps_1, weight_1, ... [form] The dynamically named form fields for each set's reps and weight.
+ * @param         rpe_recorded [form] The overall Rate of Perceived Exertion for the workout session.
+ * @param         notes_recorded [form, optional] User-provided notes for the entire workout.
+ * @returns       A `redirect` component that sends the user back to the main workout page,
+ * keeping the current workout template selected.
+ * @see           - `index.sql` - The page that contains the form that submits to this action.
+ * @see           - `views/view_full_workout_history.sql` - A page that displays data saved by this script.
+ * @note          This script uses a series of conditional INSERTs to save each set. This is a
+ * reliable pattern in SQLPage for handling a variable number of form fields.
  */
+
 ----------------------------------------------------
--- STEP 1: First, get the current user's username into a variable.
+-- STEP 1: Get user info and generate a unique ID for the main log entry.
 ----------------------------------------------------
 SET current_user = (
         SELECT username
         FROM sessions
         WHERE session_token = sqlpage.cookie('session_token')
     );
+SET new_log_id = (
+        SELECT lower(hex(randomblob(16)))
+    );
 ----------------------------------------------------
--- STEP 2: Insert the new workout record into WorkoutLog
--- INSERT PATH 1: For 'RepsOnly' exercises
+-- STEP 2: Insert a single record into the parent WorkoutLog table.
+-- This entry represents the overall workout session for the selected exercise,
+-- linking all subsequent sets together with the generated LogID.
 ----------------------------------------------------
 INSERT INTO WorkoutLog (
         LogID,
         UserID,
         ExerciseTimestamp,
         ExerciseID,
-        TotalSetsPerformed,
-        RepsPerformed,
-        WeightUsed,
-        WeightUnit,
-        RPE_Recorded,
-        WorkoutNotes,
-        LinkedTemplateID,
-        LinkedProgressionModelID,
-        PerformedAtStepNumber
-    )
-SELECT lower(hex(randomblob(16))),
-    $current_user,
-    datetime('now', 'localtime'),
-    :exercise_id,
-    :sets_recorded,
-    trim(
-        :reps_set_1 || ',' || :reps_set_2 || ',' || :reps_set_3 || ',' || :reps_set_4 || ',' || :reps_set_5
-    ),
-    0,
-    'reps',
-    :rpe_recorded,
-    CAST(:notes_recorded AS TEXT),
-    :template_id,
-    (
-        SELECT ProgressionModelID
-        FROM TemplateExerciseList
-        WHERE ExerciseID = :exercise_id
-            AND TemplateID = :template_id
-    ),
-    -- If no previous step exists, default to 1.
-    COALESCE(
-        (
-            SELECT CurrentStepNumber
-            FROM UserExerciseProgression
-            WHERE UserID = $current_user
-                AND ExerciseID = :exercise_id
-        ),
-        1
-    )
-WHERE (
-        SELECT DefaultLogType
-        FROM ExerciseLibrary
-        WHERE ExerciseID = :exercise_id
-    ) = 'RepsOnly';
--- INSERT PATH 2: For all other (weighted) exercise types
-INSERT INTO WorkoutLog (
-        LogID,
-        UserID,
-        ExerciseTimestamp,
-        ExerciseID,
-        TotalSetsPerformed,
-        RepsPerformed,
-        WeightUsed,
-        WeightUnit,
-        RPE_Recorded,
         WorkoutNotes,
         LinkedTemplateID,
         LinkedProgressionModelID,
         PerformedAtStepNumber,
         Estimated1RM
     )
-SELECT lower(hex(randomblob(16))),
+SELECT $new_log_id,
     $current_user,
-    datetime('now', 'localtime'),
+    strftime('%s', 'now'),
+    -- Use Unix timestamp for consistency
     :exercise_id,
-    :sets_recorded,
-    :reps_recorded,
-    :weight_recorded,
-    'lbs',
-    :rpe_recorded,
-    CAST(:notes_recorded AS TEXT),
+    :notes_recorded,
     :template_id,
+    -- Get the progression model from the user's current progression data
     (
         SELECT ProgressionModelID
-        FROM TemplateExerciseList
-        WHERE ExerciseID = :exercise_id
-            AND TemplateID = :template_id
+        FROM UserExerciseProgression
+        WHERE UserID = $current_user
+            AND ExerciseID = :exercise_id
     ),
-    -- If no previous step exists, default to 1.
+    -- Get the current step number, defaulting to 1 if no progression exists yet
     COALESCE(
         (
             SELECT CurrentStepNumber
@@ -132,20 +73,155 @@ SELECT lower(hex(randomblob(16))),
         ),
         1
     ),
-    :weight_recorded * (1 + (:reps_recorded / 30.0))
-WHERE (
-        SELECT DefaultLogType
-        FROM ExerciseLibrary
-        WHERE ExerciseID = :exercise_id
-    ) != 'RepsOnly';
+    -- Calculate an estimated 1RM based on the first set's performance (Epley formula)
+    CAST(:weight_1 AS REAL) * (1 + (CAST(:reps_1 AS REAL) / 30.0))
+WHERE :num_sets IS NOT NULL;
 ------------------------------------------------------------------------------------
--- STEP 3: Update the UserExerciseProgression table to the NEXT step.
+-- STEP 3: Insert each individual set into the WorkoutSetLog table.
+-- This uses a series of conditional INSERT statements. An INSERT only occurs if the
+-- corresponding form field (e.g., :reps_1) exists and is not null. This pattern
+-- reliably handles a variable number of sets up to a predefined maximum (10 in this case).
+------------------------------------------------------------------------------------
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    1,
+    :reps_1,
+    :weight_1
+WHERE :reps_1 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    2,
+    :reps_2,
+    :weight_2
+WHERE :reps_2 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    3,
+    :reps_3,
+    :weight_3
+WHERE :reps_3 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    4,
+    :reps_4,
+    :weight_4
+WHERE :reps_4 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    5,
+    :reps_5,
+    :weight_5
+WHERE :reps_5 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    6,
+    :reps_6,
+    :weight_6
+WHERE :reps_6 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    7,
+    :reps_7,
+    :weight_7
+WHERE :reps_7 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    8,
+    :reps_8,
+    :weight_8
+WHERE :reps_8 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    9,
+    :reps_9,
+    :weight_9
+WHERE :reps_9 IS NOT NULL;
+INSERT INTO WorkoutSetLog (
+        SetID,
+        LogID,
+        SetNumber,
+        RepsPerformed,
+        WeightUsed
+    )
+SELECT lower(hex(randomblob(16))),
+    $new_log_id,
+    10,
+    :reps_10,
+    :weight_10
+WHERE :reps_10 IS NOT NULL;
+------------------------------------------------------------------------------------
+-- STEP 4: Update the UserExerciseProgression table to advance the user to the NEXT step.
+-- This uses an "upsert" (INSERT ON CONFLICT) pattern. If a progression record for this user
+-- and exercise already exists, it is updated. Otherwise, a new record is created.
 ------------------------------------------------------------------------------------
 INSERT INTO UserExerciseProgression (
         UserExerciseProgressionID,
         UserID,
-        ExerciseID,
         TemplateID,
+        ExerciseID,
         ProgressionModelID,
         CurrentStepNumber,
         LastWorkoutRPE,
@@ -154,47 +230,44 @@ INSERT INTO UserExerciseProgression (
         CurrentCycle1RMEstimate
     )
 SELECT lower(hex(randomblob(16))),
-    ll.UserID,
-    ll.ExerciseID,
-    ll.LinkedTemplateID,
-    ll.LinkedProgressionModelID,
-    -- This is the key logic change: advance to the next step.
-    ll.PerformedAtStepNumber + 1,
-    ll.RPE_Recorded,
-    ll.ExerciseTimestamp,
-    CAST(
-        substr(
-            ll.RepsPerformed || ',',
-            1,
-            instr(ll.RepsPerformed || ',', ',') - 1
-        ) AS INTEGER
-    ),
-    ll.Estimated1RM
-FROM (
-        -- This subquery finds the most recent workout log for the exercise we just updated.
-        SELECT *,
-            ROW_NUMBER() OVER(
-                PARTITION BY UserID,
-                ExerciseID
-                ORDER BY ExerciseTimestamp DESC
-            ) as rn
-        FROM WorkoutLog
+    $current_user,
+    :template_id,
+    :exercise_id,
+    (
+        SELECT ProgressionModelID
+        FROM UserExerciseProgression
         WHERE UserID = $current_user
             AND ExerciseID = :exercise_id
-    ) AS ll
-WHERE ll.rn = 1
-    AND ll.LinkedProgressionModelID IS NOT NULL ON CONFLICT(UserID, ExerciseID) DO
+    ),
+    -- Advance to the next step number
+    COALESCE(
+        (
+            SELECT CurrentStepNumber
+            FROM UserExerciseProgression
+            WHERE UserID = $current_user
+                AND ExerciseID = :exercise_id
+        ),
+        0
+    ) + 1,
+    :rpe_recorded,
+    strftime('%s', 'now'),
+    CAST(:reps_1 AS INTEGER),
+    CAST(:weight_1 AS REAL) * (1 + (CAST(:reps_1 AS REAL) / 30.0))
+WHERE :num_sets IS NOT NULL -- This ON CONFLICT clause now correctly targets the three columns in the UNIQUE constraint.
+    ON CONFLICT(UserID, TemplateID, ExerciseID) DO
 UPDATE
-SET TemplateID = excluded.TemplateID,
-    ProgressionModelID = excluded.ProgressionModelID,
-    -- This is the key logic change: advance to the next step.
+SET ProgressionModelID = excluded.ProgressionModelID,
     CurrentStepNumber = excluded.CurrentStepNumber,
     LastWorkoutRPE = excluded.LastWorkoutRPE,
     DateOfLastAttempt = excluded.DateOfLastAttempt,
     MaxReps = excluded.MaxReps,
     CurrentCycle1RMEstimate = excluded.CurrentCycle1RMEstimate;
 ----------------------------------------------------
--- STEP 4: Redirect the user back to the index page.
+-- STEP 5: Redirect the user back to the index page with the template selected.
+-- This creates a seamless workflow, allowing the user to select their next exercise manually.
 ----------------------------------------------------
 SELECT 'redirect' as component,
-    'index.sql?template_id=' || :template_id as link;
+    '/index.sql?template_id=' || :template_id || COALESCE(
+        '&selected_exercise_id=' || $next_exercise_id,
+        ''
+    ) as link;

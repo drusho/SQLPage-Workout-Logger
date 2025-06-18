@@ -99,7 +99,9 @@ SELECT 'select' as type,
             )
     ) as options;
 -- Define a standalone 'Cancel' button that links back to the main exercise list.
-SELECT 'button' as component,
-    'outline' as style;
+SELECT 'button' as component;
+-- 'outline' as style;
 SELECT 'Cancel' as title,
-    '/views/view_exercises.sql' as link;
+    '/views/view_exercises.sql' as link,
+    'cancel' as icon,
+    'yellow' as outline;

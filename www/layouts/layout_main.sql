@@ -76,6 +76,14 @@ SELECT 'shell' as component,
             ),
             json_object(
                 'title',
+                'Workouts',
+                'link',
+                '/views/view_workouts.sql',
+                'icon',
+                'weight' 
+            ),            
+            json_object(
+                'title',
                 'History',
                 'link',
                 '/views/view_history.sql',

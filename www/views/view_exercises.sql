@@ -40,6 +40,7 @@ select '/actions/action_add_exercise.sql' as link,
 -- Define the table component and specify that the 'Action' column will contain Markdown links.
 SELECT 'table' as component,
     'Existing Exercises' as title,
+    TRUE as sort,
     'Action' as markdown;
 -- Select the data for the table.
 SELECT ExerciseName AS "Exercise",

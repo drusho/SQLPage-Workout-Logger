@@ -48,16 +48,18 @@ SELECT 'dynamic' AS component,
     sqlpage.run_sql('layouts/layout_main.sql') AS properties;
 -- UPDATED: New page title and subtitle section.
 SELECT 'text' as component,
-    'Delete an Exercise' as title;
-select 'Exercise name: **' || $exercise_name_to_delete || '**' as contents_md;
+    'Delete Exercise: ' || (
+        SELECT ExerciseName
+        FROM ExerciseLibrary
+        WHERE ExerciseID = $id
+    ) as title;
 SELECT 'text' as component,
     'You are about to delete the exercise: **' || $exercise_name_to_delete || '**. This is a safe "soft delete", but it will hide the exercise from lists. To proceed, please type the full name of the exercise into the box below and click the delete button.' as content_md;
 -- Define the confirmation form.
 SELECT 'form' as component,
     'action_delete_exercise.sql' as action,
     'post' as method,
-    'Delete This Exercise' as validate,
-    'trash' as icon,
+    'Delete ' || $exercise_name_to_delete as validate,
     'red' as validate_color;
 -- Hidden fields to pass the action and id back to the action handler.
 SELECT 'hidden' as type,
@@ -74,7 +76,9 @@ SELECT 'text' as type,
     TRUE as required,
     $exercise_name_to_delete as pattern;
 -- A standalone 'Cancel' button that links back to the main exercise list.
-SELECT 'button' as component,
-    'outline' as style;
+SELECT 'button' as component;
+-- 'outline' as style;
 SELECT 'Cancel' as title,
-    '/views/view_exercises.sql' as link;
+    '/views/view_exercises.sql' as link,
+    'cancel' as icon,
+    'yellow' as outline;
