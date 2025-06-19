@@ -1,20 +1,16 @@
----
-date: 2025-06-17
-title: "Database Schema Overhaul: A Changelog for Enhanced Robustness"
-summary: "A detailed log of the significant schema refactoring performed on the workout logger database to improve data integrity, performance, and overall reliability."
-tags: 
-- database
-- schema
-- refactoring
-- sqlpage- workout
+
+# 2025-06-17 - Changelog
+**updated:** 2025-06-17\
+**summary:** A detailed log of the significant schema refactoring performed on the workout logger database to improve data integrity, performance, and overall reliability.
+
 ---
 
 Today, the workout logger database underwent a significant overhaul to build a more robust and efficient foundation for the application. The primary goals were to enforce data integrity, improve query performance, and standardize data types across the schema.
 
 This document serves as a detailed changelog of the changes made to each table.
 
-> [!tip] Summary of Changes
-> 
+> [!tip] 
+> **Summary of Changes**
 > - **Enforced Data Integrity:** Added `UNIQUE`, `NOT NULL`, and `FOREIGN KEY` constraints to prevent duplicate or invalid data.
 > - **Standardized Data Types:** Converted `TEXT`-based timestamps to the more efficient `INTEGER` Unix timestamp format across all tables.
 > - **Improved Query Performance:** Added indexes to key columns that are frequently used in search and filter operations.
@@ -28,22 +24,22 @@ This document serves as a detailed changelog of the changes made to each table.
 
 The most significant change was the normalization of workout logging. The original `WorkoutLog` table stored set and rep information in a flat structure, which was inflexible. This was refactored into two related tables.
 
-> [!note] What is Normalization?
-> 
-> Normalization is the process of organizing columns and tables in a database to minimize data redundancy. By moving the repeating set data into its own WorkoutSetLog table, we reduce redundancy and make the data much easier and more powerful to query.
+> [!note] 
+> **What is Normalization?**\
+> **Normalization** is the process of organizing columns and tables in a database to minimize data redundancy. By moving the repeating set data into its own WorkoutSetLog table, we reduce redundancy and make the data much easier and more powerful to query.
 
 **`WorkoutLog` Refactor**
 
 This table now acts as a parent container for a workout session. Columns related to individual sets were removed.
 
-|   |   |   |
-|---|---|---|
 |**Change**|**Before**|**After**|
+|---|---|---|
 |Set Tracking|`TotalSetsPerformed` & `RepsPerformed` columns existed.|Columns removed; data moved to `WorkoutSetLog`.|
 |Timestamp|`ExerciseTimestamp` was `TEXT`.|`ExerciseTimestamp` is `INTEGER` (Unix time).|
 |Relationships|Implied relationships to users/exercises.|`FOREIGN KEY` constraints on `UserID` & `ExerciseID`.|
 
 `WorkoutLog` Schema
+
 ```sql
 CREATE TABLE WorkoutLog (
     LogID                      TEXT PRIMARY KEY,

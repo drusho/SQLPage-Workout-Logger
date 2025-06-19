@@ -4,7 +4,7 @@
 </br>
 
 > [!NOTE]
-> **Guiding Principle** 
+> **Guiding Principle**\ 
 > Write code and documentation for humans first, computers second. Clarity, consistency, and maintainability are the primary goals.
 
 
@@ -55,7 +55,8 @@ SELECT
     e.exercise_name
 FROM workouts w
 JOIN exercises e ON w.exercise_id = e.exercise_id;
-
+```
+```sql
 -- BAD
 SELECT w.workout_id, w.workout_date, e.exercise_name FROM workouts w JOIN exercises e ON w.exercise_id = e.exercise_id;
 ```

@@ -3,7 +3,7 @@ updated: 2025-06-19
 
 
 > [!NOTE] 
-> **A Living Document for a Healthy Database**
+> **A Living Document for a Healthy Database**\
 > This guide outlines the official procedures for managing the application's database. Its purpose is to ensure data integrity, prevent data loss, and allow the schema to evolve safely over time. Following these procedures is crucial for the long-term stability of the project.
 
 </br>
@@ -55,7 +55,7 @@ Maintenance focuses on the _health and performance_ of the existing database str
 </br>
 
 > [!NOTE] 
-> **When and Why?**
+> **When and Why?**\
 > The maintenance.sql script cleans up the database file, rebuilds indexes, and optimizes the query planner. 
 > It's best to run it after deleting a lot of data or if the app feels sluggish.
 > 
@@ -80,7 +80,7 @@ This strategy ensures we can always recover from a disaster.
 ### Disaster Recovery
 
 > [!WARNING] 
-> **How to Restore From a Backup**
+> **How to Restore From a Backup**\
 > Use this procedure only if the main database is corrupt or has suffered catastrophic data loss.
 > 
 > 1. **Stop the Application:** Ensure nothing is trying to access the database.
