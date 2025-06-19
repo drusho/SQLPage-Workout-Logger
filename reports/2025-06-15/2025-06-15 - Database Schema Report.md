@@ -1,37 +1,15 @@
----
-date: 2025-06-15
-title: "SQLPage - Workout - Database Schema Report"
-summary: "Schema and data samples for the database powering the SQLPage - Workout application."
-series: sqlpage.workout-logger
-github: https://github.com/drusho/SQLPage-Workout-Logger
-source: "/Volumes/Public/Container_Settings/sqlpage/www/workouts.db"
-categories: Homelab
-tags:
-  - sqlpage
-  - workout
-  - database
-  - schema
-  - documentation
-cssclasses:
-  - academia
-  - academia-rounded
----
->[!tip]+ Tip
+# 2025-06-15 - Database Schema Report
+
+**Summary:** \
+Schema and data samples for the database powering the SQLPage - Workout application.
+
+>[!tip]
+> **Tip**
 > - This report was auto-generated using the `SQLPage_Workout_Documentation_Generator.ipynb` notebook.
 
-## Table of Contents
-
-- [ExerciseLibrary](#exerciselibrary)
-- [WorkoutLog](#workoutlog)
-- [ProgressionModels](#progressionmodels)
-- [ProgressionModelSteps](#progressionmodelsteps)
-- [WorkoutTemplates](#workouttemplates)
-- [TemplateExerciseList](#templateexerciselist)
-- [UserExerciseProgression](#userexerciseprogression)
-- [users](#users)
-- [sessions](#sessions)
 
 ---
+
 ### ExerciseLibrary
 
 **Schema**

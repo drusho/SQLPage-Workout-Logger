@@ -1,53 +1,44 @@
+# 2025-06-15 - SQL Comment Documentation
+
+**summary:**\
+ "A guide to docstring conventions and a summary of all documented SQL files in the project."
+
 ---
-date: 2025-06-17
-title: "SQLPage - Workout - SQL Comment Documentation"
-summary: "A guide to docstring conventions and a summary of all documented SQL files in the project."
-series: sqlpage.workout-logger
-github: https://github.com/drusho/SQLPage-Workout-Logger
-source: "/Volumes/Public/Container_Settings/sqlpage"
-categories: Homelab
-tags:
-  - sqlpage
-  - documentation
-  - style-guide
-cssclasses:
-  - academia
-  - academia-rounded  
----
->[!tip]+ Tip
+
+>[!tip]
+> **Tip**
 > - This report was auto-generated using the `SQLPage_Workout_Documentation_Generator.ipynb` notebook.
+
+---
 
 ## Table of Contents
 
-- [`action_add_exercise.sql`](#action_add_exercise.sql)
-- [`action_add_workout.sql`](#action_add_workout.sql)
-- [`action_delete_exercise.sql`](#action_delete_exercise.sql)
-- [`action_edit_exercise.sql`](#action_edit_exercise.sql)
-- [`action_get_workout_template.sql`](#action_get_workout_template.sql)
-- [`action_save_workout.sql`](#action_save_workout.sql)
-- [`action_update_profile.sql`](#action_update_profile.sql)
-- [`auth_login_action.sql`](#auth_login_action.sql)
-- [`auth_login_form.sql`](#auth_login_form.sql)
-- [`auth_logout.sql`](#auth_logout.sql)
-- [`auth_signup_action.sql`](#auth_signup_action.sql)
-- [`auth_signup_form.sql`](#auth_signup_form.sql)
-- [`dev_multi-step_form.sql`](#dev_multi-step_form.sql)
-- [`dev_workouts_print_log.sql`](#dev_workouts_print_log.sql)
-- [`index.sql`](#index.sql)
-- [`layout_main.sql`](#layout_main.sql)
-- [`layout_non-auth.sql`](#layout_non-auth.sql)
-- [`profile.sql`](#profile.sql)
-- [`view_exercises.sql`](#view_exercises.sql)
-- [`view_history.sql`](#view_history.sql)
-- [`view_progression_models.sql`](#view_progression_models.sql)
-- [`view_workout_logs.sql`](#view_workout_logs.sql)
-- [`view_workouts.sql`](#view_workouts.sql)
+- [`action_add_exercise.sql`](#action_add_exercisesql)
+- [`action_delete_exercise.sql`](#action_delete_exercisesql)
+- [`action_edit_exercise.sql`](#action_edit_exercisesql)
+- [`action_save_workout.sql`](#action_save_workoutsql)
+- [`action_update_profile.sql`](#action_update_profilesql)
+- [`auth_login_action.sql`](#auth_login_actionsql)
+- [`auth_login_form.sql`](#auth_login_formsql)
+- [`auth_logout.sql`](#auth_logoutsql)
+- [`auth_signup_action.sql`](#auth_signup_actionsql)
+- [`auth_signup_form.sql`](#auth_signup_formsql)
+- [`dev_multi-step_form.sql`](#dev_multi-step_formsql)
+- [`dev_workouts_print_log.sql`](#dev_workouts_print_logsql)
+- [`index.sql`](#indexsql)
+- [`layout_main.sql`](#layout_mainsql)
+- [`layout_non-auth.sql`](#layout_non-authsql)
+- [`profile.sql`](#profilesql)
+- [`view_exercises.sql`](#view_exercisessql)
+- [`view_history.sql`](#view_historysql)
+- [`view_progression_models.sql`](#view_progression_modelssql)
+- [`view_workout_logs.sql`](#view_workout_logssql)
 ## SQL File Documentation
 
 ---
 ### `action_add_exercise.sql`
 **Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_add_exercise.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-16` ⚠️
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
 
 **Description:** Displays a form to create a new entry in the `ExerciseLibrary` table and processes the form submission.
 
@@ -75,26 +66,9 @@ cssclasses:
 - Add server-side validation to prevent creating exercises with duplicate names.
 
 ---
-### `action_add_workout.sql`
-**Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_add_workout.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-16` ⚠️
-
-**Description:** Creates a new, empty, disabled Workout Template and then immediately redirects the user to the edit page for that new template.
-
-**Requires:**
-- Writes to the `WorkoutTemplates` table.
-
-**Returns:**
-- A `redirect` component to the edit page for the newly created workout.
-
-**See Also:**
-- ../views/view_workouts.sql - The page that links to this action.
-- ../views/edit_workout.sql - The page this action redirects to.
-
----
 ### `action_delete_exercise.sql`
 **Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_delete_exercise.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-16` ⚠️
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
 
 **Description:** Displays a confirmation form to prevent accidental deletion of an exercise. Processes the soft-delete action upon confirmation.
 
@@ -120,7 +94,7 @@ cssclasses:
 ---
 ### `action_edit_exercise.sql`
 **Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_edit_exercise.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-16` ⚠️
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
 
 **Description:** Displays a form pre-filled with data for a specific exercise from the `ExerciseLibrary` table.
 
@@ -142,31 +116,9 @@ cssclasses:
 - The form fields are pre-populated using a separate, direct database query for each field.
 
 ---
-### `action_get_workout_template.sql`
-**Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_get_workout_template.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-17` ⚠️
-
-**Description:** This SQL query retrieves the details of a specific workout template based on its ID.
-
-**Requires:**
-- The `WorkoutTemplates` table, which contains the workout template data.
-
-**Parameters:**
-- {number} $1 - The ID of the workout template to retrieve.
-
-**Returns:**
-- {object} - An object containing the template name, description, and enabled status.
-
-**See Also:**
-- `action_edit_workout.sql` - The action script that uses this query to populate the edit form.
-
-**Notes:**
-- This query is used to fetch the current details of a workout template for editing purposes.
-
----
 ### `action_save_workout.sql`
 **Path:** `/Volumes/Public/Container_Settings/sqlpage/www/actions/action_save_workout.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-17` ⚠️
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
 
 **Description:** Processes and saves a completed workout set from a form submission. It first inserts a new record into the `WorkoutLog` table, then updates or creates a record in `UserExerciseProgression` to advance the user's progress for that exercise.
 
@@ -199,7 +151,6 @@ cssclasses:
 - Implement more complex progression logic based on `ProgressionModels` table.
 - Add validation for required form parameters to prevent SQL errors.
 - The 1RM estimation formula is hardcoded; consider making it dynamic.
-- The new logic for saving a workout should be: 1. Your form should now be able to submit multiple sets of reps and weight. 2. In action_save_workout.sql, you will first perform a single INSERT into the WorkoutLog table to create the main workout session entry. 3. You will then get the LogID of the row you just created. 4. Finally, you will loop through the sets submitted by the form and perform multiple INSERT statements into the new WorkoutSetLog table, using the LogID from step 3 to link them all together.
 
 ---
 ### `action_update_profile.sql`
@@ -418,7 +369,7 @@ cssclasses:
 ---
 ### `layout_main.sql`
 **Path:** `/Volumes/Public/Container_Settings/sqlpage/www/layouts/layout_main.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-16` ⚠️
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
 
 **Description:** The main application shell, included on most pages to provide a consistent layout, navigation menu, and site-wide authentication. It dynamically adjusts the navigation menu and welcome message based on the user's login status.
 
@@ -487,7 +438,7 @@ cssclasses:
 ---
 ### `view_exercises.sql`
 **Path:** `/Volumes/Public/Container_Settings/sqlpage/www/views/view_exercises.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-16` ⚠️
+**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-15` ⚠️
 
 **Description:** Displays a list of all enabled exercises from the `ExerciseLibrary`. This is the main page for exercise management.
 
@@ -596,23 +547,3 @@ cssclasses:
 - The "Delete" button is instant. Add a confirmation step (e.g., using JavaScript or a confirmation page) to prevent accidental deletions.
 - Add a "Create New Log" button to allow for manual entry of historical data.
 - Implement pagination for the main table to handle a large workout history.
-
----
-### `view_workouts.sql`
-**Path:** `/Volumes/Public/Container_Settings/sqlpage/www/views/view_workouts.sql`
-**Last Updated (doc):** `N/A` | **File Modified:** `2025-06-17` ⚠️
-
-**Description:** Displays a filterable list of all configured workouts. Allows enabling/disabling of workouts directly from the list.
-
-**Requires:**
-- The TemplateExerciseList table, which must have an `IsEnabled` column.
-
-**Parameters:**
-- action [url, optional] The action to perform ('enable' or 'disable').
-- id [url, optional] The ID of the workout to act upon.
-- template_filter [url, optional] The TemplateID to filter the list by.
-- status_filter [url, optional] The status (1 for Enabled, 0 for Disabled) to filter by.
-- prog_model_filter [url, optional] The ProgressionModelID to filter by.
-
-**TODO:**
-- Preserve filter settings in the URL after enabling/disabling a workout.
