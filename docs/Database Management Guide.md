@@ -2,8 +2,8 @@
 updated: 2025-06-19
 
 
-> [!NOTE] A Living Document for a Healthy Database
-> 
+> [!NOTE] 
+> **A Living Document for a Healthy Database**
 > This guide outlines the official procedures for managing the application's database. Its purpose is to ensure data integrity, prevent data loss, and allow the schema to evolve safely over time. Following these procedures is crucial for the long-term stability of the project.
 
 </br>
@@ -30,12 +30,10 @@ This is the process for making structural changes to the database, like adding a
 
 </br>
 
-> [!TIP] The Migration Workflow
-> 
+> [!TIP] 
+> **The Migration Workflow**
 > 1. **Create a new `.sql` script** in the `/migrations` folder (use `000_migration_template.sql` as a starting point).
->     
 > 2. **Run the `migration_runner_notebook.ipynb`**.
->     
 > 
 > For detailed instructions, see the **[migrations/README.md](https://github.com/drusho/SQLPage-Workout-Logger/blob/master/migrations/README.md)**.
 
@@ -44,7 +42,8 @@ This is the process for making structural changes to the database, like adding a
 </br>
 
 > [!TIP] 
-> The Python runner script automatically handles backups and ensures migrations only run once. This prevents most common database errors.
+> The Python runner script automatically handles backups and ensures migrations only run once. 
+> This prevents most common database errors.
 
 </br>
 
@@ -55,11 +54,12 @@ Maintenance focuses on the _health and performance_ of the existing database str
 
 </br>
 
-> [!NOTE] When and Why?
+> [!NOTE] 
+> **When and Why?**
+> The maintenance.sql script cleans up the database file, rebuilds indexes, and optimizes the query planner. 
+> It's best to run it after deleting a lot of data or if the app feels sluggish.
 > 
-> The maintenance.sql script cleans up the database file, rebuilds indexes, and optimizes the query planner. It's best to run it after deleting a lot of data or if the app feels sluggish.
-> 
-> For more details, see the **[[maintenance/README.md]]**.
+> For more details, see the **[maintenance/README.md](https://github.com/drusho/SQLPage-Workout-Logger/blob/master/maintence/README.md)**.
 
 </br>
 
@@ -79,8 +79,8 @@ This strategy ensures we can always recover from a disaster.
 
 ### Disaster Recovery
 
-> [!WARNING] How to Restore From a Backup
-> 
+> [!WARNING] 
+> **How to Restore From a Backup**
 > Use this procedure only if the main database is corrupt or has suffered catastrophic data loss.
 > 
 > 1. **Stop the Application:** Ensure nothing is trying to access the database.

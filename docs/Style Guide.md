@@ -3,7 +3,8 @@
 
 </br>
 
-> [!note] Guiding Principle
+> [!NOTE]
+> **Guiding Principle** 
 > Write code and documentation for humans first, computers second. Clarity, consistency, and maintainability are the primary goals.
 
 
@@ -101,7 +102,7 @@ The following tags should be used to document each file:
 For tags that can have multiple entries (`@requires`, `@see`, `@todo`), format each as a separate line.
 
 **Example**
-```sql
+```js
 /**
  * @requires      - The `sessions` table to identify the current user.
  * @requires      - The `users` table, which this script updates.
@@ -118,7 +119,7 @@ The `@param` tag follows a specific pattern to capture its source and optionalit
 - **`optionality`**: Can be `optional` if the parameter is not required for the script to run.
 
 **Example**
-```sql
+```js
 /**
  * @param log_id [url, optional] The ID of the `WorkoutLog` entry to act upon.
  * @param username [form] The username submitted by the user.
@@ -130,7 +131,7 @@ The `@param` tag follows a specific pattern to capture its source and optionalit
 ### Complete Example
 Docstring from `profile.sql`
 
-```sql
+```js
 /**
  * @filename profile.sql
  * @description Displays the logged-in user's profile information within an editable form.
