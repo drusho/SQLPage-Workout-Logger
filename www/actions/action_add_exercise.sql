@@ -1,20 +1,32 @@
 /**
- * @filename      add_exercise.sql
- * @description   Displays a form to create a new entry in the `ExerciseLibrary` table and processes the form submission.
+ * @filename      action_add_exercise.sql
+ * @description   A self-submitting page that displays a form to create a new exercise and processes the INSERT submission.
  * @created       2025-06-15
- * @last-updated  2025-06-15
- * @requires      - `../layouts/layout_main.sql` for the page shell and authentication.
- * @requires      - The `ExerciseLibrary` table, which this script reads from (for dropdowns) and writes to.
- * @param         action [form] A hidden parameter with the value 'add_exercise' to trigger the INSERT statement.
- * @param         name [form] The name of the new exercise.
- * @param         alias [form, optional] An optional alias for the new exercise.
- * @param         body_group [form, optional] The body group for the new exercise, selected from a dropdown.
- * @param         equipment [form, optional] The equipment needed for the new exercise.
- * @returns       On successful submission, a `redirect` component that sends the user back to the main exercise list. Otherwise, returns a UI page with a `form`.
- * @see           - `view_exercises.sql` - The page that links to this one and to which this page redirects.
- * @note          This page is self-submitting and uses the Post-Redirect-Get (PRG) pattern.
+ * @last-updated  2025-06-18
+ * @requires      - layouts/layout_main.sql: Provides the main UI shell and handles user authentication.
+ * @requires      - ExerciseLibrary (table): The target table for the INSERT and the source for the 'Body Group' dropdown.
+ * @requires      - sessions (table): Used to identify the current user and protect the page from guest access.
+ * @param         action [form] A hidden field with the value 'add_exercise' that triggers the INSERT logic on POST.
+ * @param         name [form] The required name of the new exercise.
+ * @param         alias [form, optional] An optional, shorter name for the exercise.
+ * @param         equipment [form, optional] The equipment needed for the exercise.
+ * @param         body_group [form, optional] The body group for the exercise, chosen from a dynamically populated dropdown.
+ * @returns       On a GET request, returns a UI page with a data entry form. On a POST request, it processes the data and returns a redirect component on success.
+ * @see           - /views/view_exercises.sql: The page that links to this form and the page the user is returned to after a successful submission.
+ * @note          This script follows the Post-Redirect-Get (PRG) pattern to prevent duplicate form submissions on browser refresh.
+ * @note          An authentication check is performed at the start of the script. Unauthenticated users are redirected.
  * @todo          - Add server-side validation to prevent creating exercises with duplicate names.
  */
+-- Add this block at the top of any page that saves data.
+-- It will check if a user is logged in. If not, it redirects them.
+SET current_user = (
+        SELECT username
+        FROM sessions
+        WHERE session_token = sqlpage.cookie('session_token')
+    );
+SELECT 'redirect' AS component,
+    '/auth/auth_guest_prompt.sql' AS link
+WHERE $current_user IS NULL;
 ------------------------------------------------------
 -- STEP 1: HANDLE FORM SUBMISSION
 -- This block runs first. It processes the submitted form data from a POST request

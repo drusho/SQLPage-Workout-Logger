@@ -36,7 +36,6 @@ cssclasses:
 **Views**
 - [FullWorkoutHistory](#fullworkouthistory)
 - [UserExerciseProgressionTargets](#userexerciseprogressiontargets)
-- [WorkoutTemplateDetails](#workouttemplatedetails)
 
 ## Database Properties
 
@@ -258,16 +257,16 @@ CREATE TABLE "ProgressionModels" (
 | `ExerciseAlias` | TEXT |  |  |  |
 | `ProgressionModelID` | TEXT |  |  |  |
 | `OrderInWorkout` | INTEGER |  |  |  |
-| `LastModified` | TEXT |  |  |  |
+| `LastModifiedTimestamp` | INTEGER |  | `strftime('%s', 'now')` |  |
 | `IsEnabled` | INTEGER |  | `1` |  |
 
 **Foreign Keys**
 
 | Column | References Table | Foreign Column |
 | :----- | :--------------- | :------------- |
-| `TemplateID` | `WorkoutTemplates_temp` | `TemplateID` |
-| `ProgressionModelID` | `ProgressionModels_temp` | `ProgressionModelID` |
-| `ExerciseID` | `ExerciseLibrary_temp` | `ExerciseID` |
+| `TemplateID` | `WorkoutTemplates` | `TemplateID` |
+| `ProgressionModelID` | `ProgressionModels` | `ProgressionModelID` |
+| `ExerciseID` | `ExerciseLibrary` | `ExerciseID` |
 
 **Indexes**
 
@@ -285,22 +284,22 @@ CREATE TABLE "TemplateExerciseList" (
 	"ExerciseAlias"	TEXT,
 	"ProgressionModelID"	TEXT,
 	"OrderInWorkout"	INTEGER,
-	"LastModified"	TEXT,
+	"LastModifiedTimestamp"	INTEGER DEFAULT (strftime('%s', 'now')),
 	"IsEnabled"	INTEGER DEFAULT 1,
 	PRIMARY KEY("TemplateExerciseListID"),
-	FOREIGN KEY("ExerciseID") REFERENCES "ExerciseLibrary_temp"("ExerciseID"),
-	FOREIGN KEY("ProgressionModelID") REFERENCES "ProgressionModels_temp"("ProgressionModelID"),
-	FOREIGN KEY("TemplateID") REFERENCES "WorkoutTemplates_temp"("TemplateID")
+	FOREIGN KEY("ExerciseID") REFERENCES "ExerciseLibrary"("ExerciseID"),
+	FOREIGN KEY("ProgressionModelID") REFERENCES "ProgressionModels"("ProgressionModelID"),
+	FOREIGN KEY("TemplateID") REFERENCES "WorkoutTemplates"("TemplateID")
 )
 ```
 
 **Data Samples (First 3 Rows)**
 
-| TemplateExerciseListID | TemplateID | ExerciseID | ExerciseAlias | ProgressionModelID | OrderInWorkout | LastModified | IsEnabled |
+| TemplateExerciseListID | TemplateID | ExerciseID | ExerciseAlias | ProgressionModelID | OrderInWorkout | LastModifiedTimestamp | IsEnabled |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| ET_UUID001 | WT_UUID001 | UUID001 | DB Incline | PM_8StepRPE_002 | 1 | NULL | 1 |
-| ET_UUID002 | WT_UUID001 | UUID002 | SL Leg Press | PM_8StepRPE_002 | 2 | NULL | 1 |
-| ET_UUID003 | WT_UUID001 | UUID003 | Lat Pulldowns | PM_8StepRPE_002 | 3 | NULL | 1 |
+| ET_UUID001 | WT_UUID001 | UUID001 | DB Incline | PM_8StepRPE_002 | 1 | 1750289568 | 1 |
+| ET_UUID002 | WT_UUID001 | UUID002 | SL Leg Press | PM_8StepRPE_002 | 2 | 1750289568 | 1 |
+| ET_UUID003 | WT_UUID001 | UUID003 | Lat Pulldowns | PM_8StepRPE_002 | 3 | 1750289568 | 1 |
 
 
 ---
@@ -389,7 +388,7 @@ CREATE TABLE "UserExerciseProgression" (
 | `LinkedTemplateID` | TEXT |  |  |  |
 | `LinkedProgressionModelID` | TEXT |  |  |  |
 | `PerformedAtStepNumber` | INTEGER |  |  |  |
-| `LastModified` | TEXT |  |  |  |
+| `LastModifiedTimestamp` | INTEGER |  | `strftime('%s', 'now')` |  |
 
 **Foreign Keys**
 
@@ -417,7 +416,7 @@ CREATE TABLE "WorkoutLog" (
 	"LinkedTemplateID"	TEXT,
 	"LinkedProgressionModelID"	TEXT,
 	"PerformedAtStepNumber"	INTEGER,
-	"LastModified"	TEXT,
+	"LastModifiedTimestamp"	INTEGER DEFAULT (strftime('%s', 'now')),
 	PRIMARY KEY("LogID"),
 	FOREIGN KEY("ExerciseID") REFERENCES "ExerciseLibrary"("ExerciseID"),
 	FOREIGN KEY("UserID") REFERENCES "users"("username")
@@ -426,11 +425,11 @@ CREATE TABLE "WorkoutLog" (
 
 **Data Samples (First 3 Rows)**
 
-| LogID | UserID | ExerciseTimestamp | ExerciseID | Estimated1RM | WorkoutNotes | LinkedTemplateID | LinkedProgressionModelID | PerformedAtStepNumber | LastModified |
+| LogID | UserID | ExerciseTimestamp | ExerciseID | Estimated1RM | WorkoutNotes | LinkedTemplateID | LinkedProgressionModelID | PerformedAtStepNumber | LastModifiedTimestamp |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| WLOG_UUID001 | davidrusho | 1746053682 | UUID001 | 84.0 | NULL | NULL | NULL | NULL | 2025-05-10 17:45:29 |
-| WLOG_UUID002 | davidrusho | 1746054770 | UUID002 | 151.2 | NULL | NULL | NULL | NULL | 2025-05-10 17:45:29 |
-| WLOG_UUID003 | davidrusho | 1746055694 | UUID003 | 180.0 | NULL | NULL | NULL | NULL | 2025-05-10 17:45:29 |
+| WLOG_UUID001 | davidrusho | 1746053682 | UUID001 | 84.0 | NULL | NULL | NULL | NULL | 1746899129 |
+| WLOG_UUID002 | davidrusho | 1746054770 | UUID002 | 151.2 | NULL | NULL | NULL | NULL | 1746899129 |
+| WLOG_UUID003 | davidrusho | 1746055694 | UUID003 | 180.0 | NULL | NULL | NULL | NULL | 1746899129 |
 
 
 ---
@@ -499,7 +498,7 @@ CREATE TABLE "WorkoutSetLog" (
 | `Focus` | TEXT |  |  |  |
 | `Frequency` | TEXT |  |  |  |
 | `CreatedByUserID` | TEXT | ✅ |  |  |
-| `LastModified` | INTEGER |  | `strftime('%s', 'now')` |  |
+| `LastModifiedTimestamp` | INTEGER |  | `strftime('%s', 'now')` |  |
 | `IsEnabled` | INTEGER | ✅ | `1` |  |
 
 **Foreign Keys**
@@ -512,7 +511,6 @@ CREATE TABLE "WorkoutSetLog" (
 
 | Index Name | Columns | Unique |
 | :--- | :--- | :--- |
-| `idx_workouttemplates_createdby` | `CreatedByUserID` |  |
 | `sqlite_autoindex_WorkoutTemplates_2` | `TemplateID` | ✅ |
 | `sqlite_autoindex_WorkoutTemplates_1` | `TemplateName` | ✅ |
 
@@ -527,7 +525,7 @@ CREATE TABLE "WorkoutTemplates" (
 	"Focus"	TEXT,
 	"Frequency"	TEXT,
 	"CreatedByUserID"	TEXT NOT NULL,
-	"LastModified"	INTEGER DEFAULT (strftime('%s', 'now')),
+	"LastModifiedTimestamp"	INTEGER DEFAULT (strftime('%s', 'now')),
 	"IsEnabled"	INTEGER NOT NULL DEFAULT 1,
 	PRIMARY KEY("TemplateID"),
 	FOREIGN KEY("CreatedByUserID") REFERENCES "users"("username")
@@ -536,7 +534,7 @@ CREATE TABLE "WorkoutTemplates" (
 
 **Data Samples (First 3 Rows)**
 
-| TemplateID | TemplateName | ProgressionModelID | Description | Focus | Frequency | CreatedByUserID | LastModified | IsEnabled |
+| TemplateID | TemplateName | ProgressionModelID | Description | Focus | Frequency | CreatedByUserID | LastModifiedTimestamp | IsEnabled |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | WT_UUID001 | Full Body A | PM_8StepRPE_002 | 3-day routine focusing on compound movements. | Strength | 3 times a week | davidrusho | 1746835200 | 1 |
 | WT_UUID002 | Full Body B | PM_8StepRPE_002 | 3-day routine focusing on compound movements. | Strength | 3 times a week | davidrusho | 1746835200 | 1 |
@@ -635,9 +633,56 @@ CREATE TABLE "users" (
 ---
 ### FullWorkoutHistory
 
-_Could not generate documentation for this object. It may be temporary or invalid._
+**Columns**
 
-**Error:** `no such table: main.WorkoutSetLog_temp`
+| Name | Type | Not Null | Default | Primary Key |
+| :--- | :--- | :--- | :--- | :--- |
+| `LogID` | TEXT |  |  |  |
+| `UserID` | TEXT |  |  |  |
+| `WorkoutDate` |  |  |  |  |
+| `ExerciseName` | TEXT |  |  |  |
+| `SetNumber` | INTEGER |  |  |  |
+| `RepsPerformed` | INTEGER |  |  |  |
+| `WeightUsed` | REAL |  |  |  |
+| `WeightUnit` | TEXT |  |  |  |
+| `RPE_Recorded` | REAL |  |  |  |
+| `WorkoutNotes` | TEXT |  |  |  |
+| `LastModifiedTimestamp` | INTEGER |  |  |  |
+
+**Creation SQL**
+
+```sql
+CREATE VIEW FullWorkoutHistory AS
+SELECT
+    wl.LogID,
+    wl.UserID,
+    datetime(wl.ExerciseTimestamp, 'unixepoch') as WorkoutDate,
+    el.ExerciseName,
+    wsl.SetNumber,
+    wsl.RepsPerformed,
+    wsl.WeightUsed,
+    wsl.WeightUnit,
+    wsl.RPE_Recorded,
+    wl.WorkoutNotes,
+    wl.LastModifiedTimestamp
+FROM
+    WorkoutLog wl
+JOIN
+    WorkoutSetLog wsl ON wl.LogID = wsl.LogID
+JOIN
+    ExerciseLibrary el ON wl.ExerciseID = el.ExerciseID
+ORDER BY
+    wl.ExerciseTimestamp DESC, wsl.SetNumber ASC
+```
+
+**Data Samples (First 3 Rows)**
+
+| LogID | UserID | WorkoutDate | ExerciseName | SetNumber | RepsPerformed | WeightUsed | WeightUnit | RPE_Recorded | WorkoutNotes | LastModifiedTimestamp |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| WLOG_7bdfd235-4560-4cac-bc1f-f3da37cdcef9 | davidrusho | 2025-05-30 22:26:17 | Deficit Push-up | 1 | 0 | 0.0 | Reps | 8.0 | 18, 10, 10 | 1748643977 |
+| WLOG_7bdfd235-4560-4cac-bc1f-f3da37cdcef9 | davidrusho | 2025-05-30 22:26:17 | Deficit Push-up | 2 | 0 | 0.0 | Reps | 8.0 | 18, 10, 10 | 1748643977 |
+| WLOG_7bdfd235-4560-4cac-bc1f-f3da37cdcef9 | davidrusho | 2025-05-30 22:26:17 | Deficit Push-up | 3 | 0 | 0.0 | Reps | 8.0 | 18, 10, 10 | 1748643977 |
+
 
 ---
 ### UserExerciseProgressionTargets
@@ -672,13 +717,13 @@ SELECT
     pms.StepNumber as TargetStepNumber,
     pms.TargetSetsFormula,
     pms.TargetRepsFormula,
-    -- This CASE statement calculates the target weight based on the formula type
+    -- This CASE statement is now corrected to perform the calculation
     CASE
         WHEN pms.TargetWeightFormula LIKE '%*%' THEN
-            -- Handle formulas like 'CurrentCycle1RMEstimate * 0.75'
-            CAST(REPLACE(pms.TargetWeightFormula, 'CurrentCycle1RMEstimate', uep.CurrentCycle1RMEstimate) AS REAL)
+            -- Manually parse the multiplier from the formula string and multiply
+            uep.CurrentCycle1RMEstimate * CAST(trim(substr(pms.TargetWeightFormula, instr(pms.TargetWeightFormula, '*') + 1)) AS REAL)
         ELSE
-            -- Handle simple weight values or other formulas if needed
+            -- Handle simple weight values that don't have a formula
             CAST(pms.TargetWeightFormula AS REAL)
     END as "TargetWeight",
     pms.StepNotes
@@ -697,61 +742,7 @@ WHERE
 
 | UserID | TemplateID | ExerciseID | CurrentStepNumber | CurrentCycle1RMEstimate | ProgressionModelName | TargetStepNumber | TargetSetsFormula | TargetRepsFormula | TargetWeight | StepNotes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| davidrusho | WT_UUID001 | UUID001 | 3 | 84.0 | 8-Step High Rep RPE Cycle | 3 | 3 | 12 | 84.0 | Week 3. 70-75% 1RM target |
-| davidrusho | WT_UUID001 | UUID002 | 3 | 126.0 | 8-Step High Rep RPE Cycle | 3 | 3 | 12 | 126.0 | Week 3. 70-75% 1RM target |
-| davidrusho | WT_UUID001 | UUID003 | 3 | 182.0 | 8-Step High Rep RPE Cycle | 3 | 3 | 12 | 182.0 | Week 3. 70-75% 1RM target |
-
-
----
-### WorkoutTemplateDetails
-
-**Columns**
-
-| Name | Type | Not Null | Default | Primary Key |
-| :--- | :--- | :--- | :--- | :--- |
-| `TemplateID` | TEXT |  |  |  |
-| `TemplateName` | TEXT |  |  |  |
-| `TemplateDescription` | TEXT |  |  |  |
-| `IsTemplateEnabled` | INTEGER |  |  |  |
-| `TemplateExerciseListID` | TEXT |  |  |  |
-| `OrderInWorkout` | INTEGER |  |  |  |
-| `ExerciseID` | TEXT |  |  |  |
-| `ExerciseName` | TEXT |  |  |  |
-| `ProgressionModelID` | TEXT |  |  |  |
-| `ProgressionModelName` | TEXT |  |  |  |
-
-**Creation SQL**
-
-```sql
-CREATE VIEW WorkoutTemplateDetails AS
-SELECT
-    wt.TemplateID,
-    wt.TemplateName,
-    wt.Description as TemplateDescription,
-    wt.IsEnabled as IsTemplateEnabled,
-    tel.TemplateExerciseListID,
-    tel.OrderInWorkout,
-    el.ExerciseID,
-    el.ExerciseName,
-    pm.ProgressionModelID,
-    pm.ProgressionModelName
-FROM
-    WorkoutTemplates wt
-LEFT JOIN
-    TemplateExerciseList tel ON wt.TemplateID = tel.TemplateID
-LEFT JOIN
-    ExerciseLibrary el ON tel.ExerciseID = el.ExerciseID
-LEFT JOIN
-    ProgressionModels pm ON tel.ProgressionModelID = pm.ProgressionModelID
-WHERE
-    tel.IsEnabled = 1
-```
-
-**Data Samples (First 3 Rows)**
-
-| TemplateID | TemplateName | TemplateDescription | IsTemplateEnabled | TemplateExerciseListID | OrderInWorkout | ExerciseID | ExerciseName | ProgressionModelID | ProgressionModelName |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| WT_UUID001 | Full Body A | 3-day routine focusing on compound movements. | 1 | ET_UUID001 | 1 | UUID001 | Dumbbell Incline Chest Press | PM_8StepRPE_002 | 8-Step High Rep RPE Cycle |
-| WT_UUID001 | Full Body A | 3-day routine focusing on compound movements. | 1 | ET_UUID002 | 2 | UUID002 | Single Leg Press | PM_8StepRPE_002 | 8-Step High Rep RPE Cycle |
-| WT_UUID001 | Full Body A | 3-day routine focusing on compound movements. | 1 | ET_UUID003 | 3 | UUID003 | Lat Pulldown | PM_8StepRPE_002 | 8-Step High Rep RPE Cycle |
+| davidrusho | WT_UUID001 | UUID001 | 3 | 84.0 | 8-Step High Rep RPE Cycle | 3 | 3 | 12 | 63.0 | Week 3. 70-75% 1RM target |
+| davidrusho | WT_UUID001 | UUID002 | 3 | 126.0 | 8-Step High Rep RPE Cycle | 3 | 3 | 12 | 94.5 | Week 3. 70-75% 1RM target |
+| davidrusho | WT_UUID001 | UUID003 | 3 | 182.0 | 8-Step High Rep RPE Cycle | 3 | 3 | 12 | 136.5 | Week 3. 70-75% 1RM target |
 

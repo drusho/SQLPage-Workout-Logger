@@ -18,11 +18,20 @@
  * @note          - This page uses the Post-Redirect-Get (PRG) pattern for all data modifications.
  * @note          - The edit form is rendered conditionally based on the `action=edit` URL parameter.
  * @note          - A single JSON object (`$log_data`) is used to cleanly pre-fill the edit form.
- * @todo          - The "Delete" button is instant. Add a confirmation step (e.g., using
- * JavaScript or a confirmation page) to prevent accidental deletions.
+ * @todo          - The "Delete" button is instant, should be handled by dedicated scripts in the actions/ folder
  * @todo          - Add a "Create New Log" button to allow for manual entry of historical data.
  * @todo          - Implement pagination for the main table to handle a large workout history.
  */
+-- Add this block at the top of any page that saves data.
+-- It will check if a user is logged in. If not, it redirects them.
+SET current_user = (
+        SELECT username
+        FROM sessions
+        WHERE session_token = sqlpage.cookie('session_token')
+    );
+SELECT 'redirect' AS component,
+    '/auth/auth_guest_prompt.sql' AS link
+WHERE $current_user IS NULL;
 ----------------------------------
 -- STEP 1: INCLUDE MAIN LAYOUT & AUTHENTICATION
 ----------------------------------

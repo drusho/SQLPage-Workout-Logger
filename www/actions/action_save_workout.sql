@@ -1,42 +1,47 @@
 /**
  * @filename      action_save_workout.sql
- * @description   Processes a multi-set workout form submission from index.sql. It first creates
- * a single parent entry in the `WorkoutLog` table, then saves each submitted
- * set individually into the `WorkoutSetLog` table, and finally updates the user's
- * progression record to advance them to the next step.
+ * @description   A pure action script that processes a multi-set workout form submission from index.sql. It creates a parent log entry, saves each individual set, and updates the user's progression to the next step in their plan.
  * @created       2025-06-17
  * @last-updated  2025-06-18
- * @requires      - The `WorkoutLog` and `WorkoutSetLog` tables for saving workout data.
- * @requires      - The `UserExerciseProgression` table to track and update user progress.
- * @param         template_id [form] The ID of the parent workout template.
+ * @requires      - sessions (table): To identify the current user.
+ * @requires      - WorkoutLog (table): The parent table for a workout session.
+ * @requires      - WorkoutSetLog (table): The child table for individual sets within a session.
+ * @requires      - UserExerciseProgression (table): The table that tracks a user's progress on an exercise, which is updated by this script.
+ * @param         template_id [form] The ID of the workout template being followed.
  * @param         exercise_id [form] The ID of the exercise being logged.
  * @param         num_sets [form] The total number of sets submitted from the form.
- * @param         reps_1, weight_1, ... [form] The dynamically named form fields for each set's reps and weight.
- * @param         rpe_recorded [form] The overall Rate of Perceived Exertion for the workout session.
- * @param         notes_recorded [form, optional] User-provided notes for the entire workout.
- * @returns       A `redirect` component that sends the user back to the main workout page,
- * keeping the current workout template selected.
- * @see           - `index.sql` - The page that contains the form that submits to this action.
- * @see           - `views/view_full_workout_history.sql` - A page that displays data saved by this script.
- * @note          This script uses a series of conditional INSERTs to save each set. This is a
- * reliable pattern in SQLPage for handling a variable number of form fields.
+ * @param         reps_1, weight_1, ... [form] Dynamically named fields for each set's reps and weight (up to a max of 10).
+ * @param         rpe_recorded [form] The user's Rate of Perceived Exertion for the session.
+ * @param         notes_recorded [form, optional] Any user-provided notes for the workout.
+ * @returns       A `redirect` component that sends the user back to the index page with a success flag.
+ * @see           - /index.sql: The page containing the form that submits to this action.
+ * @note          This script uses a series of conditional INSERTs to handle a variable number of sets.
+ * @note          It uses an "upsert" (INSERT ON CONFLICT) pattern to robustly create or update the user's progression record.
  */
-
 ----------------------------------------------------
--- STEP 1: Get user info and generate a unique ID for the main log entry.
+-- Step 0: Authentication Guard
+-- This block protects the action from being executed by unauthenticated users.
 ----------------------------------------------------
 SET current_user = (
         SELECT username
         FROM sessions
         WHERE session_token = sqlpage.cookie('session_token')
     );
+SELECT 'redirect' AS component,
+    '/auth/auth_guest_prompt.sql' AS link
+WHERE $current_user IS NULL;
+----------------------------------------------------
+-- STEP 1: Prepare for Logging
+-- Generate a single, unique LogID that will be used to link the parent log
+-- record with all of its child set records.
+----------------------------------------------------    
 SET new_log_id = (
         SELECT lower(hex(randomblob(16)))
     );
 ----------------------------------------------------
--- STEP 2: Insert a single record into the parent WorkoutLog table.
--- This entry represents the overall workout session for the selected exercise,
--- linking all subsequent sets together with the generated LogID.
+-- STEP 2: Insert Parent Log Record
+-- This creates a single record in the WorkoutLog table to represent the overall
+-- workout session for this exercise.
 ----------------------------------------------------
 INSERT INTO WorkoutLog (
         LogID,
@@ -77,10 +82,10 @@ SELECT $new_log_id,
     CAST(:weight_1 AS REAL) * (1 + (CAST(:reps_1 AS REAL) / 30.0))
 WHERE :num_sets IS NOT NULL;
 ------------------------------------------------------------------------------------
--- STEP 3: Insert each individual set into the WorkoutSetLog table.
--- This uses a series of conditional INSERT statements. An INSERT only occurs if the
--- corresponding form field (e.g., :reps_1) exists and is not null. This pattern
--- reliably handles a variable number of sets up to a predefined maximum (10 in this case).
+-- STEP 3: Insert Individual Set Records
+-- This section uses a series of conditional INSERT statements. An INSERT for a given
+-- set only occurs if the corresponding form field (e.g., :reps_1) was submitted.
+-- This pattern reliably handles a variable number of sets up to a predefined maximum.
 ------------------------------------------------------------------------------------
 INSERT INTO WorkoutSetLog (
         SetID,
@@ -213,9 +218,10 @@ SELECT lower(hex(randomblob(16))),
     :weight_10
 WHERE :reps_10 IS NOT NULL;
 ------------------------------------------------------------------------------------
--- STEP 4: Update the UserExerciseProgression table to advance the user to the NEXT step.
--- This uses an "upsert" (INSERT ON CONFLICT) pattern. If a progression record for this user
--- and exercise already exists, it is updated. Otherwise, a new record is created.
+-- STEP 4: Advance User Progression
+-- This uses an "upsert" (INSERT ON CONFLICT) pattern. If a progression record for
+-- this user and exercise already exists, it is updated with the latest data.
+-- Otherwise, a new record is created. The CurrentStepNumber is incremented.
 ------------------------------------------------------------------------------------
 INSERT INTO UserExerciseProgression (
         UserExerciseProgressionID,
@@ -263,11 +269,9 @@ SET ProgressionModelID = excluded.ProgressionModelID,
     MaxReps = excluded.MaxReps,
     CurrentCycle1RMEstimate = excluded.CurrentCycle1RMEstimate;
 ----------------------------------------------------
--- STEP 5: Redirect the user back to the index page with the template selected.
--- This creates a seamless workflow, allowing the user to select their next exercise manually.
+-- STEP 5: Redirect on Success
+-- Redirects the user back to the index page with a success flag, which
+-- will trigger the "Workout Saved!" alert.
 ----------------------------------------------------
 SELECT 'redirect' as component,
-    '/index.sql?template_id=' || :template_id || COALESCE(
-        '&selected_exercise_id=' || $next_exercise_id,
-        ''
-    ) as link;
+    '/index.sql?success=true' as link;

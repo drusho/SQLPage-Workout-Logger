@@ -1,24 +1,40 @@
 /**
- * @filename      delete_exercise.sql
- * @description   Displays a confirmation form to prevent accidental deletion of an exercise. Processes the soft-delete action upon confirmation.
+ * @filename      action_delete_exercise.sql
+ * @description   A self-submitting page that displays a confirmation form to prevent accidental deletion and processes a "soft delete" (by setting IsEnabled = 0) upon user confirmation.
  * @created       2025-06-15
- * @last-updated  2025-06-15
- * @requires      - `../layouts/layout_main.sql` for the page shell.
- * @requires      - The `ExerciseLibrary` table, which this script reads from and updates.
- * @param         $id [url] The `ExerciseID` of the record to be deleted.
- * @param         action [form] A hidden parameter with the value 'delete_exercise' to trigger the UPDATE statement.
- * @param         id [form] A hidden parameter containing the ExerciseID to delete.
- * @param         confirmation [form] The user-typed exercise name, required to confirm the deletion.
- * @returns       On successful submission, a `redirect` component. Otherwise, returns a UI page with the confirmation form.
- * @see           - `view_exercises.sql` - The page that links to this delete page.
- * @note          This performs a "soft delete" by setting `IsEnabled = 0`, not a hard `DELETE` from the database.
+ * @last-updated  2025-06-18
+ * @requires      - layouts/layout_main.sql: Provides the main UI shell and handles user authentication.
+ * @requires      - ExerciseLibrary (table): The source for the exercise name and the target for the UPDATE statement.
+ * @requires      - sessions (table): Used to identify the current user and protect the page from guest access.
+ * @param         $id [url] The ExerciseID of the record to be deleted, passed in the URL on the initial GET request.
+ * @param         action [form] A hidden field with the value 'delete_exercise' that triggers the UPDATE logic on POST.
+ * @param         id [form] A hidden field containing the ExerciseID to delete, passed during the POST request.
+ * @param         confirmation [form] The user-typed exercise name, which must match the actual name to confirm the deletion.
+ * @returns       On a GET request, returns a UI page with the confirmation form. On a successful POST, returns a redirect component.
+ * @see           - /views/view_exercises.sql: The page that links to this confirmation page and is the destination after a successful deletion.
+ * @note          This script performs a "soft delete" by setting the `IsEnabled` flag to 0, not by permanently removing the record.
+ * @note          It includes a safety mechanism requiring the user to type the full exercise name to confirm the action.
  */
 ------------------------------------------------------
--- STEP 1: HANDLE FORM SUBMISSION (SOFT DELETE)
--- This block runs first and only processes a POST request from the confirmation form.
+-- Step 0: Authentication Guard
+-- This block protects the action from being executed by unauthenticated users.
+----------------------------------------------------
+-- First, identify the current user based on the session cookie
+SET current_user = (
+        SELECT username
+        FROM sessions
+        WHERE session_token = sqlpage.cookie('session_token')
+    );
+SELECT 'redirect' AS component,
+    '/auth/auth_guest_prompt.sql' AS link
+WHERE $current_user IS NULL;
 ------------------------------------------------------
--- This UPDATE statement will only run if the submitted 'confirmation' text
--- exactly matches the exercise's name in the database.
+-- STEP 1: Process Form Submission (POST Request)
+-- This block executes only when the confirmation form is submitted.
+------------------------------------------------------
+-- This UPDATE statement performs the soft delete by setting IsEnabled = 0.
+-- The WHERE clause includes a critical safety check to ensure the user-typed
+-- :confirmation text exactly matches the exercise's name in the database.
 UPDATE ExerciseLibrary
 SET IsEnabled = 0,
     LastModified = strftime('%Y-%m-%d %H:%M:%S', 'now')

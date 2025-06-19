@@ -25,10 +25,21 @@
  * form to achieve a custom layout.
  * @todo          - Add "Edit" functionality for both progression models and their steps.
  * @todo          - Refactor the raw HTML form to use standard SQLPage `form` components
+ * @todo          - "delete" button in view_progression_models.sql should link to a new file like www/actions/action_delete_model.sql instead of handling the deletion itself.
  * for better consistency and maintainability.
  * @todo          - Implement more robust validation and user-friendly error handling for
  * all form submissions.
  */
+-- Add this block at the top of any page that saves data.
+-- It will check if a user is logged in. If not, it redirects them.
+SET current_user = (
+        SELECT username
+        FROM sessions
+        WHERE session_token = sqlpage.cookie('session_token')
+    );
+SELECT 'redirect' AS component,
+    '/auth/auth_guest_prompt.sql' AS link
+WHERE $current_user IS NULL;
 ------------------------------------------------------
 -- STEP 1: INCLUDE MAIN LAYOUT & AUTHENTICATION
 ------------------------------------------------------

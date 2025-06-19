@@ -61,7 +61,7 @@ Follow these instructions to get the application running on your own host.
 ### Prerequisites
 
 - Docker and Docker Compose installed on your system.
-- A Cloudflare account with a TUNNEL_TOKEN from your Zero Trust dashboard.
+- A Cloudflare account with a `TUNNEL_TOKEN` from your Zero Trust dashboard.
 
 ### Installation
 
@@ -122,18 +122,23 @@ networks: # comment this out if your not using a reverse proxy
 
 The project is organized into the following key directories:
 
-- `www/`: The web root for the SQLPage application. Contains all .sql page files, layouts, and the live workouts.db database.
-- `migrations/`: Contains a chronological history of all database schema changes. Each `.sql` file represents a single, atomic change to the database structure.
-- `backups/`: The designated destination for automated daily backups of the `workouts.db` file.
+- `www/`: The web root for the SQLPage application. Contains all `.sql` page files, layouts, and the live `workouts.db` database.
+- `migrations/`: Contains a chronological history of all database schema changes. Migrations are managed via a Python notebook to ensure safety and integrity.
+- `maintenance/`: Contains scripts for routine database optimization, such as vacuuming and reindexing.
+- `backups/`: The designated destination for automated, timestamped backups of the database, created by the migration runner.
 - `docker-compose.yml`: Defines the services, networks, and volumes for the application stack.
+
+## Database Management
+This project uses a robust, script-based approach to manage the database lifecycle. This ensures that schema changes are safe, repeatable, and version-controlled. For a complete overview of the procedures, please see the [DATABASE_MANAGEMENT_GUIDE.md]().
+
+
 
 ---
 
 ## Roadmap
 
 This project is under active development. Future goals and potential improvements include:
-
 - [ ] UI/UX Enhancements: Improve the user interface for a more polished mobile and desktop experience.
 - [ ] Advanced Charting: Integrate a charting library to visualize user progression over time.
 - [ ] Admin Dashboard: Create a dedicated dashboard for administrative tasks, such as managing users and viewing site-wide statistics.
-- [ ] Robust Backup Strategy: Implement a more robust backup strategy, such as automatically pushing encrypted backups to a cloud storage provider.
+- [ ] Enhance Backup Strategy: Further improve the backup strategy, such as by automatically pushing encrypted backups to a cloud storage provider (e.g., S3).

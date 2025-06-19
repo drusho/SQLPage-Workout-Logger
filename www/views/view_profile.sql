@@ -1,17 +1,15 @@
 /**
  * @filename      profile.sql
- * @description   Displays the logged-in user's profile information within an editable form.
- * It fetches the user's display name, profile picture URL, and bio,
- * allowing the user to update them by submitting the form.
+ * @description   Displays the user's profile information within an editable form.
+ * Gracefully handles guest users by displaying "Guest" as the name.
  * @created       2025-06-14
- * @last-updated  2025-06-15 16:59:26 MDT
+ * @last-updated  2025-06-18 16:09:41 MDT
  * @requires      - `layouts/layout_main.sql` for the page shell and authentication.
  * @requires      - The `sessions` and `users` tables to fetch the current user's data.
  * @param         sqlpage.cookie('session_token') [cookie] Used to identify the logged-in user.
  * @returns       A full UI page containing the user's profile picture (if available) and a
  * form pre-filled with their current profile information.
  * @see           - `action_update_profile.sql` - The script that this page's form submits to.
- * @note          - This page requires a user to be logged in with a valid session cookie.
  * @note          - It safely fetches all user data into a single JSON object (`$user_data`)
  * to prevent errors if some profile fields are empty (`NULL`).
  * @todo          - Consider adding an actual file upload component for the profile picture
@@ -22,10 +20,6 @@
 ------------------------------------------------------
 SELECT 'dynamic' AS component,
     sqlpage.run_sql('layouts/layout_main.sql') AS properties;
--- Optional: Display debug alert
--- SELECT 'alert' as component,
---     'Debug' as title,
---     'User: ' || $current_user || ', Name: ' || $display_name as description;
 ------------------------------------------------------
 -- STEP 2: Identify the current user based on their session cookie.
 ------------------------------------------------------
@@ -52,8 +46,12 @@ SET user_data = (
     );
 ------------------------------------------------------
 -- STEP 4: Extract individual values from the JSON object into variables.
+-- Use COALESCE to set the display_name to 'Guest' if the user is not logged in.
 ------------------------------------------------------    
-SET display_name = json_extract($user_data, '$.display_name');
+SET display_name = COALESCE(
+        json_extract($user_data, '$.display_name'),
+        'Guest'
+    );
 SET profile_picture_url = json_extract($user_data, '$.profile_picture_url');
 SET bio = json_extract($user_data, '$.bio');
 ------------------------------------------------------

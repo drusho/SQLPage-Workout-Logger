@@ -1,22 +1,41 @@
 /**
- * @filename      edit_exercise.sql
- * @description   Displays a form pre-filled with data for a specific exercise from the `ExerciseLibrary` table.
+ * @filename      action_edit_exercise.sql
+ * @description   A self-submitting page that displays a form pre-filled with an exercise's current data and processes the UPDATE submission.
  * @created       2025-06-15
- * @last-updated  2025-06-15
- * @requires      - `layouts/layout_main.sql` for the page shell and authentication.
- * @requires      - The `ExerciseLibrary` table, which this script reads from to populate the form.
- * @param         $id [url] The `ExerciseID` of the record to be edited, passed in the URL.
- * @returns       A UI page containing a form pre-filled with the data for the specified exercise.
- * @see           - `view_exercises.sql` - The page that links to this edit page.
- * @see           - `../actions/action_edit_exercise.sql` - The script that processes this form's submission.
- * @note          The form fields are pre-populated using a separate, direct database query for each field.
+ * @last-updated  2025-06-18
+ * @requires      - layouts/layout_main.sql: Provides the main UI shell and handles user authentication.
+ * @requires      - ExerciseLibrary (table): The source for the exercise data and the target for the UPDATE statement.
+ * @requires      - sessions (table): Used to identify the current user and protect the page from guest access.
+ * @param         $id [url] The ExerciseID of the record to be edited, passed in the URL on the initial GET request.
+ * @param         action [form] A hidden field with the value 'update_exercise' that triggers the UPDATE logic on POST.
+ * @param         id [form] A hidden field containing the ExerciseID to update, passed during the POST request.
+ * @param         name [form] The new name for the exercise.
+ * @param         alias [form, optional] The new alias for the exercise.
+ * @param         equipment [form, optional] The new equipment needed for the exercise.
+ * @param         body_group [form, optional] The new body group for the exercise.
+ * @returns       On a GET request, returns a UI page with the pre-filled form. On a successful POST, returns a redirect component.
+ * @see           - /views/view_exercises.sql: The page that links to this edit page and is the destination after a successful update.
+ * @note          This script follows the Post-Redirect-Get (PRG) pattern. An authentication check is performed at the start.
+ * @note          Each form field is pre-populated by running its own individual query against the database.
  */
+ ----------------------------------------------------
+-- Step 0: Authentication Guard
+-- This block protects the action from being executed by unauthenticated users.
+----------------------------------------------------
+SET current_user = (
+        SELECT username
+        FROM sessions
+        WHERE session_token = sqlpage.cookie('session_token')
+    );
+SELECT 'redirect' AS component,
+    '/auth/auth_guest_prompt.sql' AS link
+WHERE $current_user IS NULL;
 ------------------------------------------------------
--- STEP 1: HANDLE FORM SUBMISSION
--- This block runs first when the form is POSTed.
+-- STEP 1: Process Form Submission (POST Request)
+-- This block executes only when the page receives a POST request from the form submission.
 ------------------------------------------------------
--- The UPDATE statement uses the submitted form fields (e.g., :name, :alias)
--- and the hidden :id field to update the correct database row.
+-- This UPDATE statement applies the submitted form data to the correct database record.
+-- It also updates the timestamp to reflect the latest modification.
 UPDATE ExerciseLibrary
 SET ExerciseName = :name,
     ExerciseAlias = :alias,
@@ -30,8 +49,8 @@ SELECT 'redirect' as component,
     '/views/view_exercises.sql' as link
 WHERE :action = 'update_exercise';
 ------------------------------------------------------
--- STEP 2: RENDER PAGE STRUCTURE
--- This block sets up the basic visual shell and title for the page.
+-- STEP 2: Render Page Skeleton (GET Request)
+-- This block sets up the main page structure and title on an initial page load.
 ------------------------------------------------------
 -- Load the main layout, which includes the navigation menu and footer.
 SELECT 'dynamic' AS component,
@@ -44,10 +63,11 @@ SELECT 'text' as component,
         WHERE ExerciseID = $id
     ) as title;
 ------------------------------------------------------
--- STEP 3: RENDER THE 'EDIT EXERCISE' FORM
--- This block defines all the components that make up the input form.
+-- STEP 3: Render Edit Form (GET Request)
+-- This block defines the data entry form. Each field runs a separate query
+-- to pre-fill its value with the exercise's current data.
 ------------------------------------------------------
--- Define the main <form> element. It now POSTs to a dedicated action script.
+-- Define the main <form> element.
 SELECT 'form' as component,
     'action_edit_exercise.sql' as action,
     'post' as method,

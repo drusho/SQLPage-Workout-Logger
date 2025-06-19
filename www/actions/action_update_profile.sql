@@ -19,6 +19,16 @@
  * @todo          - Implement a check to ensure a user session is valid before the `UPDATE`
  * and show an error message if the session is invalid or expired.
  */
+-- Add this block at the top of any page that saves data.
+-- It will check if a user is logged in. If not, it redirects them.
+SET current_user = (
+        SELECT username
+        FROM sessions
+        WHERE session_token = sqlpage.cookie('session_token')
+    );
+SELECT 'redirect' AS component,
+    '/auth/auth_guest_prompt.sql' AS link
+WHERE $current_user IS NULL;
 --------------------------------------------------------------------
 -- STEP 1: Get the current user's username from their session cookie
 --------------------------------------------------------------------

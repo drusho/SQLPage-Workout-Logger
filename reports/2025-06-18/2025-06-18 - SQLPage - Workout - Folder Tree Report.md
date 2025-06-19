@@ -22,10 +22,15 @@ cssclasses:
 sqlpage/
 ├── .gitignore
 ├── README.md
+├── assets
+│   ├── 2025-06-18-exercise-library.png
+│   ├── 2025-06-18-home-page.png
+│   └── 2025-06-18-workouts.png
 ├── backups
 │   ├── README.md
 │   ├── workouts-2025-06-14.db
-│   └── workouts-2025-06-17.db
+│   ├── workouts-2025-06-17.db
+│   └── workouts-2025-06-18.db
 ├── migrations
 │   ├── 001_create_isenabled_column.sql
 │   ├── 002_create_isenabled_column.sql
@@ -44,7 +49,9 @@ sqlpage/
 │   │   ├── 2025-06-17 - SQLPage - Workout - Folder Tree Report.md
 │   │   └── 2025-06-17 - SQLPage - Workout - SQL Comment Documentation.md
 │   └── 2025-06-18
-│       └── 2025-06-18 - SQLPage - Workout - Database Schema Report.md
+│       ├── 2025-06-18 - SQLPage - Workout - Database Schema Report.md
+│       ├── 2025-06-18 - SQLPage - Workout - Folder Tree Report.md
+│       └── 2025-06-18 - SQLPage - Workout - SQL Comment Documentation.md
 └── www
     ├── actions
     │   ├── action_add_exercise.sql
@@ -52,12 +59,13 @@ sqlpage/
     │   ├── action_delete_exercise.sql
     │   ├── action_edit_exercise.sql
     │   ├── action_edit_workout.sql
-    │   ├── action_get_target_by_exercise.sql
     │   ├── action_get_workout_template.sql
     │   ├── action_save_workout.sql
     │   └── action_update_profile.sql
+    ├── assets
     ├── auth
     │   ├── README.md
+    │   ├── auth_guest_prompt.sql
     │   ├── auth_login_action.sql
     │   ├── auth_login_form.sql
     │   ├── auth_logout.sql
@@ -71,7 +79,6 @@ sqlpage/
     ├── layouts
     │   ├── layout_main.sql
     │   └── layout_non-auth.sql
-    ├── profile.sql
     ├── sqlpage
     │   ├── sqlpage.json
     │   └── templates
@@ -81,9 +88,9 @@ sqlpage/
     ├── views
     │   ├── view_exercises.sql
     │   ├── view_history.sql
+    │   ├── view_profile.sql
     │   ├── view_progression_models.sql
     │   ├── view_workout_logs.sql
     │   └── view_workouts.sql
-    ├── workouts.db
-    └── workouts_old.db
+    └── workouts.db
 ```
