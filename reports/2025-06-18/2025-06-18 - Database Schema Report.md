@@ -4,7 +4,6 @@
 Schema and data samples for the database powering the SQLPage - Workout application.
 
 >[!tip]
-> **Tip**
 > - This report was auto-generated using the `SQLPage_Workout_Documentation_Generator.ipynb` notebook.
 
 ---

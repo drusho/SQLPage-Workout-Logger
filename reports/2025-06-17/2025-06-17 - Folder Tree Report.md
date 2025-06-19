@@ -4,7 +4,6 @@
  "An ASCII tree representation of the file and folder structure for the SQLPage - Workout project.
 
 >[!tip]
-> **Tip**
 > - This report was auto-generated using the `SQLPage_Workout_Documentation_Generator.ipynb` notebook.
 
 ---
