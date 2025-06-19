@@ -3,8 +3,8 @@
 
 </br>
 
->[!note]+ Guiding Principle
->Write code and documentation for humans first, computers second. Clarity, consistency, and maintainability are the primary goals.
+> [!note] Guiding Principle
+> Write code and documentation for humans first, computers second. Clarity, consistency, and maintainability are the primary goals.
 
 
 ## File Naming Conventions

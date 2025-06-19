@@ -129,7 +129,7 @@ The project is organized into the following key directories:
 - `docker-compose.yml`: Defines the services, networks, and volumes for the application stack.
 
 ## Database Management
-This project uses a robust, script-based approach to manage the database lifecycle. This ensures that schema changes are safe, repeatable, and version-controlled. For a complete overview of the procedures, please see the [DATABASE_MANAGEMENT_GUIDE.md]().
+This project uses a robust, script-based approach to manage the database lifecycle. This ensures that schema changes are safe, repeatable, and version-controlled. For a complete overview of the procedures, please see the [DATABASE_MANAGEMENT_GUIDE.md](https://github.com/drusho/SQLPage-Workout-Logger/blob/master/docs/Database%20Management%20Guide.md).
 
 
 
