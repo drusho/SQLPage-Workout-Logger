@@ -24,11 +24,14 @@ SET current_display_name = (
 -- STEP 2: DEFINE THE MAIN PAGE LAYOUT
 ------------------------------------------------------
 SELECT 'shell' as component,
-    'Workout Logger' as title,
+    $current_display_name as title,
+    -- 'description' as description,
+    'Workout Logger' as navbar_title,
     'barbell' as icon,
     '/' as link,
-    true as sidebar,
-    'boxed' as layout,
+    TRUE as sidebar,
+    'dark' as sidebar_theme,
+    'fluid' as layout,
     'en-US' as language,
     '[Built with SQLPage](https://github.com/sqlpage/SQLPage/tree/main/examples/official-site)' as footer,
     ------------------------------------------------------    
@@ -54,7 +57,7 @@ SELECT 'shell' as component,
         ),
         json_object(
             'title',
-            'Workouts',
+            ' Workouts',
             'link',
             '/views/view_workouts.sql',
             'icon',
@@ -72,7 +75,7 @@ SELECT 'shell' as component,
             'title',
             'Progression',
             'link',
-            '/views/view_progression_models.sql',
+            '/views/view_progression_models.sql ',
             'icon',
             'trending-up'
         ),
@@ -98,7 +101,7 @@ SELECT 'shell' as component,
     ------------------------------------------------------
     json_object(
         'title',
-        'Welcome, ' || COALESCE($current_display_name, 'Guest'),
+        'Welcome: ' || COALESCE($current_display_name, 'Guest'),
         'link',
         '/profile.sql'
     ) as user;
@@ -106,8 +109,7 @@ SELECT 'shell' as component,
 --  * @filename      layout_main.sql
 --  * @description   The main application shell, included on most pages to provide a consistent
 --  * layout, navigation menu, and site-wide authentication. It dynamically
---  * adjusts the navigation menu and welcome message based on the user's login status.
---  * @created       2025-06-14
+--  * adjusts the navigation menu and welcome message based on the user' s login status.--  * @created       2025-06-14
 --  * @last-updated  2025-06-15
 --  * @requires      - The `sessions` table to identify the logged-in user.
 --  * @requires      - The `users` table to fetch the user's display name.
