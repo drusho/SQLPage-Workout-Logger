@@ -43,12 +43,13 @@ SELECT
     strftime ('%Y.%m.%d', wl.ExerciseTimestamp, 'unixepoch') AS "Date",
     el.ExerciseAlias AS "Name",
     CASE wsl.WeightUsed
-        WHEN 0 THEN GROUP_CONCAT (wsl.SetNumber || 'x' || wsl.RepsPerformed, ' | ')
+        WHEN 0 THEN GROUP_CONCAT (wsl.SetNumber || 'x' || wsl.RepsPerformed, ' - ')
         ELSE GROUP_CONCAT (
             wsl.SetNumber || 'x' || wsl.RepsPerformed || ':' || CAST(ROUND(wsl.WeightUsed) as INTEGER),
-            ' | '
+            ' - '
         )
     END AS "Summary (SxR:wt)",
+    wsl.RPE_Recorded as RPE,
     wl.WorkoutNotes as Notes,
     format (
         '[Edit](/actions/action_edit_workout_log.sql?id=%s)',
