@@ -49,6 +49,7 @@ SELECT
             ' - '
         )
     END AS "Summary (SxR:wt)",
+    wl.PerformedAtStepNumber as Step,
     wsl.RPE_Recorded as RPE,
     wl.WorkoutNotes as Notes,
     format (
@@ -60,12 +61,13 @@ FROM
     JOIN ExerciseLibrary AS el ON wl.ExerciseID = el.ExerciseID
     LEFT JOIN WorkoutSetLog AS wsl ON wl.LogID = wsl.LogID
 WHERE
-    wsl.RepsPerformed IS NOT NULL
-    AND wsl.RepsPerformed != ''
+    wsl.RepsPerformed != ''
 GROUP BY
-    wl.LogID,
-    "Date",
-    "Name",
-    "Action"
+    wl.LogID
+    -- "Date"
+    -- "Name"
+    -- "Action",
+    -- "Step"
+    -- "RPE"
 ORDER BY
     wl.ExerciseTimestamp DESC;
