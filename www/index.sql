@@ -281,7 +281,7 @@ SELECT 'number' as type,
     type_name || '_' || set_number as name,
     CASE
         WHEN type_name = 'reps' THEN 'Set ' || set_number
-        ELSE 'Set ' || set_number
+        ELSE '' -- ELSE 'Set ' || set_number
     END as label,
     CASE
         WHEN type_name = 'reps' THEN 'Reps'
@@ -313,3 +313,16 @@ SELECT 'textarea' as type,
     'Workout Notes' as label,
     6 as width
 WHERE :selected_exercise_id IS NOT NULL;
+------------------------------------------------------
+-- STEP 7: Update Exercise Progression Targets
+------------------------------------------------------
+select 'divider' as component;
+select 'text' as component;
+select "**Update Exercise Targets**\
+Steps, max weight, and progression targets for the selected exercise." as contents_md;
+select 'button' as component;
+select 'actions/action_update_progression_targets.sql' as link,
+    'Update Exercise' as title,
+    'warning' as color,
+    -- 'post' as method,
+    'upload' as icon;

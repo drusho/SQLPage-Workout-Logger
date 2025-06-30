@@ -107,6 +107,7 @@ select 'Clear Filters' as title,
 SELECT 'table' as component,
     'Configured Workouts' as title,
     TRUE as sort,
+    TRUE as small,
     json_array('Status', 'Action') as markdown;
 SELECT wt.TemplateName AS "Template",
     tel.ExerciseAlias AS "Workout Name (Alias)",

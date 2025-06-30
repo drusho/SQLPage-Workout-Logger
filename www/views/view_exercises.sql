@@ -41,6 +41,7 @@ select '/actions/action_add_exercise.sql' as link,
 SELECT 'table' as component,
     'Existing Exercises' as title,
     TRUE as sort,
+    TRUE as small,
     'Action' as markdown;
 -- Select the data for the table.
 SELECT ExerciseName AS "Exercise",
