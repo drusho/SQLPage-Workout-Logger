@@ -43,12 +43,11 @@ SET current_user = (
 UPDATE users
 SET display_name = :display_name,
     profile_picture_url = :profile_picture_url,
-    bio = :bio
+    bio = :bio,
+    timezone = :timezone
 WHERE username = $current_user;
 -------------------------------------------------------------------
 -- STEP 3: Redirect back to the profile page with a success message
 -------------------------------------------------------------------
 SELECT 'redirect' as component,
-    'profile.sql' as link,
-    'Success' as title,
-    'Your profile has been updated.' as description;
+       '/views/view_profile.sql' AS link;

@@ -24,6 +24,9 @@ SELECT
     'dynamic' AS component,
     sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
 
+
+SELECT 'text' as component,
+    'Exericse History' as title;
 ------------------------------------------------------
 -- STEP 2: Create the table component.
 ------------------------------------------------------   

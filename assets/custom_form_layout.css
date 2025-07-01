@@ -1,0 +1,31 @@
+/*
+ * Custom styles for the workout log edit form.
+ * This creates a two-column layout for each set, with the label on the left
+ * and the stacked inputs on the right.
+*/
+
+.set-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start; /* Aligns items to the top */
+    margin-bottom: 1.25rem; /* Space between each set */
+    padding-top: 0.5rem;
+    border-top: 1px solid #ddd;
+}
+
+.set-label {
+    flex: 0 0 100px; /* Do not grow, do not shrink, start at 100px width */
+    font-weight: bold;
+    padding-top: 0.5rem; /* Vertically align with the input boxes */
+}
+
+.set-inputs {
+    flex-grow: 1; /* Take up the remaining space */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Add a little space between the stacked Reps and Weight inputs */
+.set-inputs > div:not(:last-child) {
+    margin-bottom: 0.5rem;
+}
