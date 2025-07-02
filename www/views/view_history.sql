@@ -1,19 +1,14 @@
 /**
  * @filename      view_history.sql
- * @description   Displays a high-level summary of workout logs, grouping all sets for a given
- * exercise into a single, readable line. This provides a user-friendly,
- * aggregated view of the entire training history.
+ * @description   Displays a high-level summary of workout logs, grouping all sets for a given exercise and day into a single line. This provides a user-friendly, aggregated view of the entire training history and serves as the main entry point for managing that history.
  * @created       2025-06-14
- * @last-updated  2025-06-29
- * @requires      - `layouts/layout_main.sql` for the page shell and authentication.
- * @requires      - The `WorkoutLog` table to fetch workout data.
- * @requires      - The `ExerciseLibrary` table to display exercise names.
- * @requires      - The `WorkoutSetLog` table for specific set metrics.
- * @returns       A full UI page containing a searchable and sortable `table` of the
- * aggregated workout history. Each row represents a full workout session.
- * @see           - `action_edit_workout_log.sql` - The action that this page links to.
- * @note          This page aggregates data. The `Summary` column is a concatenation
- * of all sets performed for that workout instance.
+ * @last-updated  2025-07-02
+ * @requires      - layouts/layout_main.sql: For the page shell and authentication.
+ * @requires      - WorkoutLog, WorkoutSetLog, ExerciseLibrary (tables): To fetch and display the aggregated workout data.
+ * @returns       A full UI page containing a searchable and sortable table of the aggregated workout history.
+ * @see           - /actions/action_edit_history.sql: The unified page for both creating new logs and editing existing ones.
+ * @note          This page aggregates data from WorkoutSetLog into a single summary line using the GROUP_CONCAT function.
+ * @note          The "Add Workout Log" button links to action_edit_history.sql without an ID parameter to enter "create" mode. The "Edit" link in each row links to the same file but passes a LogID to enter "edit" mode.
  * @todo          - Add server-side pagination to improve performance when the log history grows large.
  * @todo          - Implement advanced filtering options, such as by date range or by exercise.
  */

@@ -1,23 +1,28 @@
 /**
  * @filename      action_edit_history.sql
- * @description   A self-submitting page that allows a user to create a new workout log or edit the details of a previously logged one.
+ * @description   A self-submitting page that allows a user to create a new workout log or edit the details of a previously logged one. It handles form rendering on GET requests and processes database changes on POST requests. This script also contains the core logic for the progressive overload system.
  * @created       2025-06-30
- * @last-updated  2025-07-01
+ * @last-updated  2025-07-02
  * @requires      - layouts/layout_main.sql: Provides the main UI shell and authentication.
- * @requires      - WorkoutLog, WorkoutSetLog, UserExerciseProgression (tables): For reading and writing log/progression data.
- * @param         id [url, optional] The LogID of the workout entry to be edited. If absent, the page enters "create" mode.
- * @param         action [form] Hidden field with value 'update_log' or 'insert_log' to trigger the POST logic.
- * @param         log_id [form] Hidden field containing the LogID for the update queries.
+ * @requires      - sessions (table): Used to identify the current user.
+ * @requires      - WorkoutLog, WorkoutSetLog (tables): The target tables for creating and updating workout records.
+ * @requires      - UserExerciseProgression, UserExerciseProgressionHistory (tables): The target tables for the progressive overload logic.
+ * @requires      - ExerciseLibrary, TemplateExerciseList (tables): Used for populating form dropdowns and linking exercises to templates.
+ * @param         id [url, optional] The LogID of the workout entry to be edited. If this parameter is absent, the page enters "create" mode.
+ * @param         action [form] A hidden field with the value 'insert_log' or 'update_log' to trigger the appropriate POST logic.
+ * @param         log_id [form] A hidden field containing the LogID for the update queries.
+ * @param         workout_date [form] The date the workout was performed.
  * @param         workout_exercise [form] The ExerciseID for the log.
  * @param         reps_*, weight_* [form] Dynamically named fields for each set's reps and weight.
- * @param         rpe_recorded [form] The overall RPE for the workout.
- * @param         workout_notes [form] The user-provided notes for the workout.
- * @param         new_step_number [form] The new progression step number for the user's exercise plan.
- * @returns       On a GET request, returns a UI page with a form (either blank or pre-filled). On a POST request, it processes all
- * updates/inserts and redirects the user back to the main workout history page.
+ * @param         rpe_recorded [form] The user's Rate of Perceived Exertion for the session. A value of 8 or lower triggers the progression logic.
+ * @param         workout_notes [form] User-provided notes for the workout.
+ * @returns       On a GET request, returns a UI page with a form (either blank or pre-filled). On a POST request, it processes all data and returns a redirect component.
  * @see           - /views/view_history.sql: The page that links to this page and is the destination after an action.
- * @note          This script follows the Post-Redirect-Get (PRG) pattern. It ensures a minimum of 5 set
- * input rows are displayed. The update process completely replaces the old sets with the new data from the form.
+ * @see           - /actions/action_delete_history.sql: The delete confirmation page, which is linked from the bottom of the edit form.
+ * @note          This script follows the Post-Redirect-Get (PRG) pattern. It uses a conditional WHERE clause on all rendering components to prevent them from executing during a POST request, avoiding "single shell" errors.
+ * @note          The progressive overload logic is idempotent. It checks the UserExerciseProgressionHistory table to ensure that progression is only granted once per unique workout LogID.
+ * @note          The script uses an UPSERT (INSERT ... ON CONFLICT ... DO UPDATE) statement on the UserExerciseProgression table. This allows it to correctly create a new progression record for an exercise the first time it's performed with a low RPE, or update the existing record on subsequent progressions.
+ * @todo          - Fix progression from Edit.  Increasing RPE should increase step number, but it currently does not.  `UserExerciseProgressionHistory` and `UserExerciseProgression` are not being updated correctly.
  */
 ------------------------------------------------------
 -- STEP 0: Authentication Guard
@@ -222,7 +227,106 @@ WHERE
     AND :reps_5 IS NOT NULL
     AND :reps_5 != '';
 
--- STEP 1.6: After all actions, redirect the user to the history page.
+-- STEP 1.6: Handle Progressive Overload (Corrected Order of Operations)
+SET
+    grant_progression = (
+        SELECT
+            IIF(
+                :rpe_recorded <= 8
+                AND NOT EXISTS (
+                    SELECT
+                        1
+                    FROM
+                        UserExerciseProgressionHistory
+                    WHERE
+                        LogID = $target_log_id
+                ),
+                1,
+                0
+            )
+    );
+
+-- CRITICAL FIX 1: Capture the state BEFORE the update occurs.
+-- COALESCE handles cases where the user has no prior progression, starting them at 0.
+SET
+    old_step_for_history = (
+        SELECT
+            COALESCE(CurrentStepNumber, 0)
+        FROM
+            UserExerciseProgression
+        WHERE
+            UserID = $current_user
+            AND ExerciseID = :workout_exercise
+    );
+
+-- This UPSERT statement correctly creates or updates the progression record.
+INSERT INTO
+    UserExerciseProgression (
+        UserExerciseProgressionID,
+        UserID,
+        ExerciseID,
+        TemplateID,
+        ProgressionModelID,
+        CurrentStepNumber,
+        LastWorkoutRPE,
+        DateOfLastAttempt
+    )
+SELECT
+    LOWER(HEX(RANDOMBLOB(16))),
+    $current_user,
+    :workout_exercise,
+    tel.TemplateID,
+    tel.ProgressionModelID,
+    1,
+    :rpe_recorded,
+    STRFTIME('%s', 'now')
+FROM
+    TemplateExerciseList AS tel
+WHERE
+    tel.ExerciseID = :workout_exercise
+    AND $grant_progression = 1
+ON CONFLICT (UserID, TemplateID, ExerciseID) DO UPDATE
+SET
+    CurrentStepNumber = CurrentStepNumber + 1,
+    LastWorkoutRPE = :rpe_recorded,
+    DateOfLastAttempt = STRFTIME('%s', 'now')
+WHERE
+    $grant_progression = 1;
+
+-- CRITICAL FIX 2: The history log now uses the state we captured BEFORE the update.
+INSERT INTO
+    UserExerciseProgressionHistory (
+        ProgressionHistoryID,
+        UserID,
+        ExerciseID,
+        TemplateID,
+        LogID,
+        ChangeTimestamp,
+        OldStepNumber,
+        NewStepNumber,
+        ReasonForChange
+    )
+SELECT
+    LOWER(HEX(RANDOMBLOB(16))),
+    $current_user,
+    :workout_exercise,
+    (
+        SELECT
+            TemplateID
+        FROM
+            TemplateExerciseList
+        WHERE
+            ExerciseID = :workout_exercise
+    ),
+    $target_log_id,
+    STRFTIME('%s', 'now'),
+    $old_step_for_history, -- Use the value we saved
+    $old_step_for_history + 1, -- Calculate the new step based on the saved value
+    'Completed workout with RPE <= 8'
+WHERE
+    $grant_progression = 1;
+
+-- STEP 1.7: After all actions, redirect the user to the history page.
 SELECT
     'redirect' AS component,
     '/views/view_history.sql?saved=true' AS link

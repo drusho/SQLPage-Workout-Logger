@@ -1,20 +1,19 @@
 /**
  * @filename      action_delete_history.sql
- * @description   A self-submitting page that displays a confirmation form to prevent accidental deletion and processes a "hard delete" from the WorkoutLog, WorkoutSetLog, and UserExerciseProgressionHistory tables upon user confirmation.
+ * @description   A self-submitting page that displays a confirmation form to prevent accidental deletion of a workout log. It also handles reverting any progression changes that were triggered by the deleted log.
  * @created       2025-07-01
- * @last-updated  2025-07-01
- * @requires      - layouts/layout_main.sql: Provides the main UI shell and handles user authentication.
- * @requires      - WorkoutLog, ExerciseLibrary, UserExerciseProgressionHistory (tables): The source for the log data and the target for the DELETE statement.
- * @requires      - sessions (table): Used to identify the current user and protect the page from guest access.
- * @param         $id [url] The LogID of the record to be deleted, passed in the URL from the edit history page.
+ * @last-updated  2025-07-02
+ * @requires      - layouts/layout_main.sql: Provides the main UI shell and authentication.
+ * @requires      - WorkoutLog, WorkoutSetLog, UserExerciseProgression, UserExerciseProgressionHistory, sessions (tables).
+ * @param         $id [url] The LogID of the record to be deleted, passed in the URL.
  * @param         action [form] A hidden field with the value 'delete_log' that triggers the DELETE logic on POST.
  * @param         id [form] A hidden field containing the LogID to delete, passed during the POST request.
  * @param         confirmation [form] The user-typed exercise name, which must match the actual name to confirm the deletion.
  * @returns       On a GET request, returns a UI page with the confirmation form. On a successful POST, returns a redirect component.
  * @see           - /views/view_history.sql: The page the user is returned to after a successful deletion.
  * @see           - /actions/action_edit_history.sql: The page that links to this confirmation page.
- * @note          This script performs a "hard delete" by permanently removing the record from WorkoutLog and any associated progression history. Associated sets in WorkoutSetLog are removed automatically via a cascading delete trigger in the database.
- * @note          It includes a safety mechanism requiring the user to type the full exercise name to confirm the action.
+ * @note          This script performs a "hard delete" by permanently removing the record from WorkoutLog. Associated sets in WorkoutSetLog are removed automatically via a cascading delete trigger in the database.
+ * @note          Before deleting the log, the script checks the UserExerciseProgressionHistory table. If the log being deleted had previously triggered a progression, the script reverts the changes in the UserExerciseProgression table to restore the user's progression to its prior state.
  */
 ------------------------------------------------------
 -- Step 0: Authentication Guard
@@ -41,6 +40,40 @@ WHERE
 -- STEP 1: Process Form Submission (POST Request)
 -- This block executes only when the confirmation form is submitted.
 ------------------------------------------------------
+-- STEP 1.0: Check for and Revert Progression Changes before Deletion
+-- Find the progression change that was triggered by the log we are about to delete.
+SET
+    history_to_revert = (
+        SELECT
+            JSON_OBJECT(
+                'UserID',
+                UserID,
+                'ExerciseID',
+                ExerciseID,
+                'TemplateID',
+                TemplateID,
+                'OldStepNumber',
+                OldStepNumber,
+                'Old1RMEstimate',
+                OldCycle1RMEstimate
+            )
+        FROM
+            UserExerciseProgressionHistory
+        WHERE
+            LogID = :id
+    );
+
+-- If a history record was found, it means we need to revert the main progression table.
+UPDATE UserExerciseProgression
+SET
+    CurrentStepNumber = JSON_EXTRACT($history_to_revert, '$.OldStepNumber'),
+    CurrentCycle1RMEstimate = JSON_EXTRACT($history_to_revert, '$.Old1RMEstimate')
+WHERE
+    UserID = JSON_EXTRACT($history_to_revert, '$.UserID')
+    AND ExerciseID = JSON_EXTRACT($history_to_revert, '$.ExerciseID')
+    AND TemplateID = JSON_EXTRACT($history_to_revert, '$.TemplateID')
+    AND $history_to_revert IS NOT NULL;
+
 -- 1.1: First, delete any progression history records linked to this workout log.
 -- This must be done before deleting the WorkoutLog entry itself to avoid violating foreign key constraints if they were enforced.
 DELETE FROM UserExerciseProgressionHistory
