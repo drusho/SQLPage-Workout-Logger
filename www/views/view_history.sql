@@ -26,9 +26,24 @@ SELECT
 
 
 SELECT 'text' as component,
-    'Exericse History' as title;
+    'Exericse History' as title,
+    'Exercise sets are grouped into a single line, see Summary header (**Set** x **Reps**: **Weight**)' as contents_md;
+    
+
+
 ------------------------------------------------------
--- STEP 2: Create the table component.
+-- STEP 2: Create the 'Add Exercise' Button
+------------------------------------------------------   
+
+SELECT 'button' as component,
+    'md' as size;
+SELECT '/actions/action_edit_history.sql' as link,
+    'green' as color,
+    'Add Exercise' as title,
+    'plus' as icon;
+
+------------------------------------------------------
+-- STEP 3: Create the table component.
 ------------------------------------------------------   
 SELECT
     'table' as component,
@@ -38,7 +53,7 @@ SELECT
     json_array ('Action') as markdown;
 
 ------------------------------------------------------
--- STEP 3: Fetch and display the workout data.
+-- STEP 4: Fetch and display the workout data.
 -- This query joins workout logs with exercises and aggregates the data
 -- from individual sets to display a summary for each workout.
 ------------------------------------------------------      
@@ -51,12 +66,12 @@ SELECT
             wsl.SetNumber || 'x' || wsl.RepsPerformed || ':' || CAST(ROUND(wsl.WeightUsed) as INTEGER),
             ' - '
         )
-    END AS "Summary (SxR:wt)",
+    END AS "Summary",
     wl.PerformedAtStepNumber as Step,
     wsl.RPE_Recorded as RPE,
     wl.WorkoutNotes as Notes,
     format (
-        '[Edit](/actions/action_edit_workout_log.sql?id=%s)',
+        '[Edit](/actions/action_edit_history.sql?id=%s)',
         wl.LogID
     ) AS "Action"
 FROM
