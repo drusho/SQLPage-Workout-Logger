@@ -41,12 +41,18 @@ WHERE
 ------------------------------------------------------
 -- STEP 1: Process POST Request (Create or Update Log)
 ------------------------------------------------------
--- 1.1 Handle INSERT for a new log
-SELECT
-    LOWER(HEX(RANDOMBLOB(16))) AS new_log_id
-WHERE
-    :action = 'insert_log';
+-- STEP 1.1: Determine the Target Log ID
+SET
+    target_log_id = (
+        SELECT
+            CASE
+                WHEN :action = 'insert_log' THEN LOWER(HEX(RANDOMBLOB(16)))
+                ELSE :log_id
+            END
+    );
 
+-- STEP 1.2: Handle INSERT for a new log
+-- This now uses the reliable $target_log_id variable.
 INSERT INTO
     WorkoutLog (
         LogID,
@@ -57,7 +63,7 @@ INSERT INTO
         LastModifiedTimestamp
     )
 SELECT
-    $new_log_id,
+    $target_log_id,
     $current_user,
     STRFTIME('%s', :workout_date),
     :workout_exercise,
@@ -66,7 +72,8 @@ SELECT
 WHERE
     :action = 'insert_log';
 
--- 1.2: Handle UPDATE for an existing log
+-- STEP 1.3: Handle UPDATE for an existing log
+-- This also uses the reliable $target_log_id variable.
 UPDATE WorkoutLog
 SET
     WorkoutNotes = :workout_notes,
@@ -74,20 +81,17 @@ SET
     ExerciseTimestamp = STRFTIME('%s', :workout_date),
     LastModifiedTimestamp = STRFTIME('%s', 'now')
 WHERE
-    LogID = :log_id
+    LogID = $target_log_id
     AND :action = 'update_log';
 
--- 1.3: Delete old sets if we are updating an existing log
+-- STEP 1.4: Delete old sets if we are updating an existing log
 DELETE FROM WorkoutSetLog
 WHERE
-    LogID = :log_id
+    LogID = $target_log_id
     AND :action = 'update_log';
 
--- 1.4: Insert the newly submitted sets for both INSERT and UPDATE actions
-SET
-    target_log_id = COALESCE(:log_id, $new_log_id);
-
--- This series of INSERTs handles up to 5 sets. It will only insert a row if the 'reps' field for that set is not empty.
+-- STEP 1.5: Insert the newly submitted sets for both INSERT and UPDATE actions
+-- This block remains the same, but it now uses the consistently defined $target_log_id.
 INSERT INTO
     WorkoutSetLog (
         SetID,
@@ -218,7 +222,7 @@ WHERE
     AND :reps_5 IS NOT NULL
     AND :reps_5 != '';
 
--- 1.5: After all actions, redirect the user to the history page.
+-- STEP 1.6: After all actions, redirect the user to the history page.
 SELECT
     'redirect' AS component,
     '/views/view_history.sql?saved=true' AS link
@@ -230,9 +234,12 @@ WHERE
 -- STEP 2: Render Page Skeleton & Get User/Log Data
 ------------------------------------------------------
 -- 2.1: Include the main layout
+-- STEP 2.1: Include the main layout
 SELECT
     'dynamic' AS component,
-    sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
+    sqlpage.run_sql ('layouts/layout_main.sql') AS properties
+WHERE
+    :action IS NULL;
 
 -- 2.2: Fetch the workout log details, defaulting to a new, empty log if no ID is provided
 SET
@@ -341,25 +348,33 @@ SET
 ------------------------------------------------------
 SELECT
     'text' AS component,
-    $page_title AS title;
+    $page_title AS title
+WHERE
+    :action IS NULL;
 
 SELECT
     'form' AS component,
     $button_text AS validate,
     'green' AS validate_color,
     'post' AS method,
-    $form_action AS ACTION;
+    $form_action AS ACTION
+WHERE
+    :action IS NULL;
 
 -- Hidden fields to manage state
 SELECT
     'hidden' AS type,
     'action' AS name,
-    $action_verb AS value;
+    $action_verb AS value
+WHERE
+    :action IS NULL;
 
 SELECT
     'hidden' AS type,
     'log_id' AS name,
-    $id AS value;
+    $id AS value
+WHERE
+    :action IS NULL;
 
 -- Date and Exercise Selection
 SELECT
@@ -485,7 +500,8 @@ SELECT
     'button' AS component,
     'md' AS size
 WHERE
-    $id IS NOT NULL;
+    $id IS NOT NULL
+    AND :action IS NULL;
 
 SELECT
     '/actions/action_delete_history.sql?id=' || $id AS link,
