@@ -1,0 +1,28 @@
+table_name: dimDate
+description: "A standard date dimension table for time-based analysis and reporting."
+owner: "David R."
+tags:
+  - dimension
+  - core
+columns:
+  - name: dateId
+    description: "Primary Key for the date in YYYYMMDD integer format."
+    tests:
+      - unique
+      - not_null
+  - name: fullDate
+    description: "The full date value in YYYY-MM-DD format."
+    tests:
+      - not_null
+  - name: dayOfWeek
+    description: "The name of the day of the week, e.g., 'Monday'."
+    tests:
+      - not_null
+  - name: monthName
+    description: "The name of the month, e.g., 'January'."
+    tests:
+      - not_null
+  - name: year
+    description: "The four-digit year."
+    tests:
+      - not_null

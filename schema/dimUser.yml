@@ -1,0 +1,21 @@
+table_name: dimUser
+description: "Dimension table that stores core user profile information."
+owner: "David R."
+tags:
+  - dimension
+  - user_data
+  - core
+columns:
+  - name: userId
+    description: "The unique identifier for the user. Primary Key."
+    tests:
+      - unique
+      - not_null
+  - name: displayName
+    description: "The user's public-facing name."
+    tests:
+      - not_null
+  - name: timezone
+    description: "The user's local timezone (IANA format) to adjust timestamps, e.g., 'America/Denver'."
+    tests:
+      - not_null

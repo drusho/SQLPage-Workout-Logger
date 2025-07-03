@@ -1,0 +1,25 @@
+table_name: dimUserExercisePreferences
+description: "Stores user-specific aliases for exercises, allowing users to customize exercise names."
+owner: "David R."
+tags:
+  - dimension
+  - user_data
+columns:
+  - name: userId
+    description: "Part of the composite Primary Key. Foreign Key referencing dimUser."
+    tests:
+      - not_null
+      - relationships:
+          to: dimUser
+          field: userId
+  - name: exerciseId
+    description: "Part of the composite Primary Key. Foreign Key referencing dimExercise."
+    tests:
+      - not_null
+      - relationships:
+          to: dimExercise
+          field: exerciseId
+  - name: userExerciseAlias
+    description: "The custom name the user has assigned to the exercise."
+    tests:
+      - not_null

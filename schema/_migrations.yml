@@ -1,0 +1,16 @@
+table_name: _migrations
+description: "Internal table used by the migration runner to track which SQL migration scripts have been successfully applied."
+owner: "System"
+tags:
+  - meta
+  - migrations
+columns:
+  - name: filename
+    description: "The name of the SQL migration file. Primary Key."
+    tests:
+      - unique
+      - not_null
+  - name: applied_at
+    description: "The timestamp when the migration was applied."
+    tests:
+      - not_null

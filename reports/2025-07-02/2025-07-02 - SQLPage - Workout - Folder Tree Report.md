@@ -35,7 +35,19 @@ sqlpage/
 │   ├── workouts-2025-06-19.db
 │   ├── workouts-2025-06-30.db
 │   ├── workouts-backup-2025-06-30_184258.db
-│   └── workouts-backup-2025-06-30_195301.db
+│   ├── workouts-backup-2025-06-30_195301.db
+│   ├── workouts-backup-2025-07-02_185257.db
+│   ├── workouts-backup-2025-07-02_190008.db
+│   ├── workouts-backup-2025-07-02_190141.db
+│   ├── workouts-backup-2025-07-02_190308.db
+│   ├── workouts-backup-2025-07-02_190454.db
+│   ├── workouts-backup-2025-07-02_190638.db
+│   ├── workouts-backup-2025-07-02_190727.db
+│   ├── workouts-backup-2025-07-02_191946.db
+│   ├── workouts-backup-2025-07-02_192157.db
+│   ├── workouts-backup-2025-07-02_192646.db
+│   ├── workouts-backup-2025-07-02_193023.db
+│   └── workouts-backup-2025-07-02_193429.db
 ├── docs
 │   ├── App Design & Flow.md
 │   ├── Database Management Guide.md
@@ -51,6 +63,12 @@ sqlpage/
 │   ├── 001_recreate_views.sql
 │   ├── 002_add_progression_history.sql
 │   ├── 003_add_timezone_to_users.sql
+│   ├── 004_create_star_schema_tables.sql
+│   ├── 005_populate_dimensions.sql
+│   ├── 006_populate_plans_and_facts.sql
+│   ├── 007_decommission_old_tables.sql
+│   ├── 008_decommision_old_tables_again.sql
+│   ├── 009_consolidate_star_schema_migration.sql
 │   ├── README.md
 │   └── migrations_runner_notebook.ipynb
 ├── notebooks
@@ -81,8 +99,26 @@ sqlpage/
 │       ├── 2025-07-02 - SQLPage - Workout - Folder Tree Report.md
 │       └── 2025-07-02 - SQLPage - Workout - SQL Comment Documentation.md
 ├── schema
+│   ├── DimDate.yml
+│   ├── DimExercise.yml
+│   ├── DimExercisePlan.yml
+│   ├── DimUser.yml
+│   ├── DimUserExercisePreferences.yml
+│   ├── ExerciseLibrary.yml
+│   ├── FactWorkoutHistory.yml
+│   ├── ProgressionModelSteps.yml
+│   ├── ProgressionModels.yml
 │   ├── README.md
-│   └── WorkoutTemplates.yaml
+│   ├── TemplateExerciseList.yml
+│   ├── UserExerciseProgression.yml
+│   ├── UserExerciseProgressionHistory.yml
+│   ├── WorkoutLog.yml
+│   ├── WorkoutSetLog.yml
+│   ├── WorkoutTemplates.yaml
+│   ├── WorkoutTemplates.yml
+│   ├── _migrations.yml
+│   ├── sessions.yml
+│   └── users.yml
 └── www
     ├── actions
     │   ├── action_add_exercise.sql

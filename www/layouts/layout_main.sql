@@ -9,17 +9,17 @@
 ------------------------------------------------------
 -- STEP 1: Identify the current user
 ------------------------------------------------------
-SET current_user_name = (
-        SELECT username
-        FROM sessions
-        WHERE session_token = sqlpage.cookie('session_token')
-            AND expires_at > CURRENT_TIMESTAMP
-    );
-SET current_display_name = (
-        SELECT display_name
-        FROM users
-        WHERE username = $current_user_name
-    );
+-- SET current_user_name = (
+--         SELECT username
+--         FROM sessions
+--         WHERE session_token = sqlpage.cookie('session_token')
+--             AND expires_at > CURRENT_TIMESTAMP
+--     );
+-- SET current_display_name = (
+--         SELECT display_name
+--         FROM users
+--         WHERE username = $current_user_name
+--     );
 ------------------------------------------------------
 -- STEP 2: DEFINE THE MAIN PAGE LAYOUT
 ------------------------------------------------------

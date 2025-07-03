@@ -1,0 +1,57 @@
+table_name: factWorkoutHistory
+description: "The central fact table. Each row represents one set performed by a user. This is the ultimate source of truth for all calculations."
+owner: "David R."
+tags:
+  - fact
+  - core
+columns:
+  - name: workoutHistoryId
+    description: "The unique identifier for this specific set log. Primary Key."
+    tests:
+      - unique
+      - not_null
+  - name: userId
+    description: "Foreign Key referencing the user who performed the set."
+    tests:
+      - not_null
+      - relationships:
+          to: dimUser
+          field: userId
+  - name: exerciseId
+    description: "Foreign Key referencing the exercise that was performed."
+    tests:
+      - not_null
+      - relationships:
+          to: dimExercise
+          field: exerciseId
+  - name: dateId
+    description: "Foreign Key referencing the date the workout was performed."
+    tests:
+      - not_null
+      - relationships:
+          to: dimDate
+          field: dateId
+  - name: exercisePlanId
+    description: "Foreign Key referencing the active exercise plan at the time of the workout."
+  - name: setNumber
+    description: "The number of the set within the workout session (e.g., 1, 2, 3)."
+    tests:
+      - not_null
+  - name: repsPerformed
+    description: "The number of repetitions performed in the set."
+    tests:
+      - not_null
+  - name: weightUsed
+    description: "The weight used for the set."
+    tests:
+      - not_null
+  - name: rpeRecorded
+    description: "The Rate of Perceived Exertion for the set. An RPE of 0 indicates a deload/non-progression workout."
+  - name: createdAt
+    description: "Unix timestamp of when the set was first logged."
+    tests:
+      - not_null
+  - name: updatedAt
+    description: "Unix timestamp, updated anytime the record is edited."
+    tests:
+      - not_null

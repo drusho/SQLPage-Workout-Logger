@@ -1,0 +1,25 @@
+table_name: sessions
+description: "Stores active user session tokens for authentication. This table is managed by the SQLPage authentication system."
+owner: "System"
+tags:
+  - meta
+  - auth
+columns:
+  - name: session_token
+    description: "The unique token identifying a user's session. Primary Key."
+    tests:
+      - unique
+      - not_null
+  - name: username
+    description: "The user associated with the session. Foreign Key referencing DimUser."
+    tests:
+      - not_null
+      # Note: The foreign key in the database points to the old 'users' table.
+      # This test documents the intended relationship with the new schema.
+      - relationships:
+          to: DimUser
+          field: UserKey
+  - name: expires_at
+    description: "The timestamp when the session token becomes invalid."
+    tests:
+      - not_null
