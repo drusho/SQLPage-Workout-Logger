@@ -1,172 +1,117 @@
 /**
  * @filename      view_profile.sql
- * @description   Displays an editable form for the user's profile information. It allows the user
- * to update their display name, profile picture URL, bio, and timezone. The form is
- * pre-filled with the user's current data.
+ * @description   Displays forms for the logged-in user to update their profile
+ * information and change their password.
  * @created       2025-06-18
- * @last-updated  2025-06-30
- * @requires      - layouts/layout_main.sql: For the main UI shell and authentication.
- * @requires      - sessions (table): To identify the current logged-in user.
- * @requires      - users (table): To read and pre-fill the user's profile data.
- * @param         sqlpage.cookie('session_token') [cookie] Implicitly used to identify the logged-in user.
- * @returns       A full UI page containing a form pre-filled with the user's current profile information.
- * @see           - /actions/action_update_profile.sql: The script that this page's form submits to.
- * @note          It safely fetches all user data into a single JSON object (`$user_data`) to prevent
- * errors if some profile fields are empty (NULL).
+ * @last-updated  2025-07-03
+ * @requires      - `layouts/layout_main.sql`, which provides the page shell.
+ * @requires      - The `dimUser` and `sessions` tables to fetch user data.
+ * @returns       A UI page with pre-filled forms for profile management.
  */
-------------------------------------------------------
--- STEP 1: Include the main application layout and authentication check.
-------------------------------------------------------
+-- Step 1: Load the main layout.
 SELECT
     'dynamic' AS component,
     sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
 
-------------------------------------------------------
--- STEP 2: Identify the current user based on their session cookie.
-------------------------------------------------------
+-- Step 2: Get all necessary information for the current user in a single query.
+-- This single query joins the sessions and user tables to fetch all data at once.
 SET
-    current_user = (
-        SELECT
-            username
-        FROM
-            sessions
-        WHERE
-            session_token = sqlpage.cookie ('session_token')
-    );
-
-------------------------------------------------------
--- STEP 3: Load all profile data into a single JSON variable.
--- This is a safe way to fetch data, as it prevents errors if some fields are empty (NULL).
-------------------------------------------------------
-SET
-    user_data = (
+    current_user_data = (
         SELECT
             JSON_OBJECT(
-                'username',
-                username,
-                'display_name',
-                COALESCE(display_name, username),
-                'profile_picture_url',
-                profile_picture_url,
-                'bio',
-                bio,
+                'userId',
+                s.username,
+                'displayName',
+                u.displayName,
                 'timezone',
-                timezone
+                u.timezone
             )
         FROM
-            users
+            sessions s
+            JOIN dimUser u ON s.username = u.userId
         WHERE
-            username = $current_user
+            s.session_token = sqlpage.cookie ('session_token')
+            AND s.expires_at > CURRENT_TIMESTAMP
     );
 
-------------------------------------------------------
--- STEP 4: Extract individual values from the JSON object into variables.
--- Use COALESCE to set the display_name to 'Guest' if the user is not logged in.
-------------------------------------------------------    
+-- Extract the needed values from the JSON object into variables.
 SET
-    display_name = COALESCE(
-        JSON_EXTRACT($user_data, '$.display_name'),
-        'Guest'
-    );
+    current_user_id = JSON_EXTRACT($current_user_data, '$.userId');
 
 SET
-    profile_picture_url = JSON_EXTRACT($user_data, '$.profile_picture_url');
+    current_user_display_name = JSON_EXTRACT($current_user_data, '$.displayName');
 
 SET
-    bio = JSON_EXTRACT($user_data, '$.bio');
+    user_timezone = JSON_EXTRACT($current_user_data, '$.timezone');
 
-------------------------------------------------------
--- STEP 5: Display the profile editing form.
--- The form is pre-filled with the user's current data from the variables we set above.
-------------------------------------------------------
+-- Step 3: Display any success or error messages passed back from action scripts.
 SELECT
-    'form' AS component,
-    'Edit Your Profile' AS title,
-    '/actions/action_update_profile.sql' AS ACTION,
-    'Update Profile' AS validate,
-    'green' AS validate_color;
-
--- Form fields
-SELECT
-    'text' AS type,
-    'display_name' AS name,
-    'Display Name' AS label,
-    JSON_EXTRACT($user_data, '$.display_name') AS value;
+    'alert' as component,
+    'Success' as title,
+    $message as description,
+    'success' as color
+WHERE
+    $message IS NOT NULL;
 
 SELECT
-    'text' AS type,
-    'profile_picture_url' AS name,
-    'Profile Picture URL' AS label,
-    JSON_EXTRACT($user_data, '$.profile_picture_url') AS value;
+    'alert' as component,
+    'Error' as title,
+    $error as description,
+    'danger' as color
+WHERE
+    $error IS NOT NULL;
+
+-- Step 4: Display the page header.
+SELECT
+    'text' as component,
+    'User Profile: ' || $current_user_display_name as title;
 
 SELECT
-    'textarea' AS type,
-    'bio' AS name,
-    'Bio' AS label,
-    JSON_EXTRACT($user_data, '$.bio') AS value;
+    'text' as component,
+    'Your User ID is: **' || $current_user_id || '**' as contents_md;
 
--- Timezone selector dropdown
+-- Step 5: Display the form to update display name and timezone.
 SELECT
-    'select' AS type,
-    'timezone' AS name,
-    'Timezone' AS label,
-    'Select your timezone' AS empty_option,
-    TRUE AS searchable,
-    JSON_EXTRACT($user_data, '$.timezone') AS value,
-    -- A partial list of common timezones. You can expand this list as needed.
-    JSON_GROUP_ARRAY(JSON_OBJECT('value', value, 'label', label)) AS options
-FROM
-    (
-        SELECT
-            'America/New_York' AS value,
-            '(GMT-04:00) Eastern Time' AS label
-        UNION ALL
-        SELECT
-            'America/Chicago',
-            '(GMT-05:00) Central Time'
-        UNION ALL
-        SELECT
-            'America/Denver',
-            '(GMT-06:00) Mountain Time'
-        UNION ALL
-        SELECT
-            'America/Los_Angeles',
-            '(GMT-07:00) Pacific Time'
-        UNION ALL
-        SELECT
-            'America/Anchorage',
-            '(GMT-08:00) Alaska'
-        UNION ALL
-        SELECT
-            'America/Honolulu',
-            '(GMT-10:00) Hawaii'
-        UNION ALL
-        SELECT
-            'Europe/London',
-            '(GMT+01:00) London'
-        UNION ALL
-        SELECT
-            'Europe/Paris',
-            '(GMT+02:00) Paris'
-        UNION ALL
-        SELECT
-            'Asia/Tokyo',
-            '(GMT+09:00) Tokyo'
-    );
+    'form' as component,
+    'Update Profile' as title,
+    '/actions/action_update_profile.sql' as action,
+    'Update Profile' as validate;
 
 SELECT
-    'button' AS component,
-    'sm' AS size,
-    'pill' AS shape;
+    'text' as type,
+    'displayName' as name,
+    'Display Name' as label,
+    $current_user_display_name as value,
+    true as required;
 
 SELECT
-    'Purple' AS title,
-    'purple' AS outline;
+    'text' as type,
+    'timezone' as name,
+    'Timezone' as label,
+    $user_timezone as value,
+    true as required;
+
+-- Step 6: Display the form to change the password.
+SELECT
+    'form' as component,
+    'Change Password' as title,
+    '/actions/action_change_password.sql' as action,
+    'Change Password' as validate;
 
 SELECT
-    'Orange' AS title,
-    'orange' AS outline;
+    'password' as type,
+    'currentPassword' as name,
+    'Current Password' as label,
+    true as required;
 
 SELECT
-    'Red' AS title,
-    'red' AS outline;
+    'password' as type,
+    'newPassword' as name,
+    'New Password' as label,
+    true as required;
+
+SELECT
+    'password' as type,
+    'confirmPassword' as name,
+    'Confirm New Password' as label,
+    true as required;

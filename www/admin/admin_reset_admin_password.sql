@@ -1,0 +1,33 @@
+-- -- Page: /admin/reset_admin_password.sql
+-- -- Description: A utility page to create or reset the 'davidrusho' admin account
+-- -- using a robust UPSERT command.
+-- -- This single UPSERT command will create the 'davidrusho' user if they do not exist,
+-- -- or it will update their password hash if they already do. This is the safest
+-- -- way to ensure the password is set correctly.
+-- -- The default password will be set to 'davidrusho'.
+-- INSERT INTO
+--     dimUser (userId, displayName, passwordHash)
+-- VALUES
+--     (
+--         'davidrusho',
+--         'David Rusho',
+--         sqlpage.hash_password ('davidrusho')
+--     )
+-- ON CONFLICT (userId) DO UPDATE
+-- SET
+--     passwordHash = excluded.passwordHash;
+
+-- -- Display a confirmation message to the user.
+-- SELECT
+--     'alert' AS component,
+--     'Admin Password Reset' AS title,
+--     'The password for the user `davidrusho` has been successfully set to `davidrusho`.' AS description,
+--     'success' AS color;
+
+-- SELECT
+--     'text' AS component,
+--     'You can now attempt to log in again.' AS contents_md;
+
+-- SELECT
+--     'text' AS component,
+--     '[Return to Login Page](/auth/auth_login_form.sql)' AS contents_md;

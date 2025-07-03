@@ -1,22 +1,24 @@
 table_name: dimExercisePlan
 description: "Dimension table that consolidates a user's current progression state for a specific exercise."
-owner: "David R."
+created_at: "2025-06-02"
+updated_at: "2025-06-02"
+owner: "David Rusho"
 tags:
   - dimension
   - core
 columns:
+  - name: currentStepNumber
+    description: "The user's current step in the progression model for this exercise."
+
+  - name: current1rmEstimate
+    description: "The user's current estimated 1-Rep Max for this exercise."
+
   - name: exercisePlanId
     description: "The unique identifier for this specific user-exercise plan. Primary Key."
     tests:
       - unique
       - not_null
-  - name: userId
-    description: "Foreign Key referencing the user this plan belongs to."
-    tests:
-      - not_null
-      - relationships:
-          to: dimUser
-          field: userId
+
   - name: exerciseId
     description: "Foreign Key referencing the exercise this plan is for."
     tests:
@@ -24,21 +26,30 @@ columns:
       - relationships:
           to: dimExercise
           field: exerciseId
-  - name: templateName
-    description: "The default, global name of the workout template this plan originated from."
-  - name: userTemplateAlias
-    description: "The user's custom name for this workout template."
+
   - name: isActive
     description: "Flag to indicate if this is the currently active plan for the user/exercise (1=Active, 0=Archived)."
     tests:
       - not_null
       - accepted_values:
           values: [0, 1]
-  - name: currentStepNumber
-    description: "The user's current step in the progression model for this exercise."
-  - name: current1rmEstimate
-    description: "The user's current estimated 1-Rep Max for this exercise."
-  - name: targetSets
-    description: "The target number of sets for the current step."
+
+  - name: templateName
+    description: "The default, global name of the workout template this plan originated from."
+
   - name: targetReps
     description: "The target number of reps for the current step."
+
+  - name: targetSets
+    description: "The target number of sets for the current step."
+
+  - name: userId
+    description: "Foreign Key referencing the user this plan belongs to."
+    tests:
+      - not_null
+      - relationships:
+          to: dimUser
+          field: userId
+
+  - name: userTemplateAlias
+    description: "The user's custom name for this workout template."

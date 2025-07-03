@@ -1,21 +1,30 @@
 table_name: dimUser
 description: "Dimension table that stores core user profile information."
-owner: "David R."
+created_at: "2025-06-02"
+updated_at: "2025-06-03"
+owner: "David Rusho"
 tags:
   - dimension
   - user_data
   - core
+
 columns:
-  - name: userId
-    description: "The unique identifier for the user. Primary Key."
-    tests:
-      - unique
-      - not_null
+
   - name: displayName
     description: "The user's public-facing name."
     tests:
       - not_null
+  - name: passwordHash
+    description: "The secure, one-way hash of the user's password."
+    tests: []
+
   - name: timezone
     description: "The user's local timezone (IANA format) to adjust timestamps, e.g., 'America/Denver'."
     tests:
+      - not_null
+
+  - name: userId
+    description: "The unique identifier for the user. Primary Key."
+    tests:
+      - unique
       - not_null

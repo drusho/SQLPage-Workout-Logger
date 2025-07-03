@@ -14,18 +14,18 @@
  * @note          This layout is intended ONLY for development and is not for production use.
  * It does not perform any authentication checks.
  */
-
 ------------------------------------------------------
 -- STEP 1: DEFINE THE SHELL LAYOUT This only runs if 
 -- the authentication check above passes.
 ------------------------------------------------------    
-SELECT 'shell' as component,
+SELECT
+    'shell' as component,
     'Workout Logger' as title,
     'barbell' as icon,
     '/' as link,
     true as sidebar,
-    json_array(
-        json_object(
+    JSON_ARRAY(
+        JSON_OBJECT(
             'title',
             'Log',
             'link',
@@ -33,7 +33,7 @@ SELECT 'shell' as component,
             'icon',
             'home'
         ),
-        json_object(
+        JSON_OBJECT(
             'title',
             'Exercises',
             'link',
@@ -41,7 +41,7 @@ SELECT 'shell' as component,
             'icon',
             'weight'
         ),
-        json_object(
+        JSON_OBJECT(
             'title',
             'History',
             'link',
@@ -49,7 +49,7 @@ SELECT 'shell' as component,
             'icon',
             'edit'
         ),
-        json_object(
+        JSON_OBJECT(
             'title',
             'Progression',
             'link',
@@ -57,7 +57,7 @@ SELECT 'shell' as component,
             'icon',
             'trending-up'
         ),
-        json_object(
+        JSON_OBJECT(
             'title',
             'Profile',
             'link',
@@ -65,7 +65,7 @@ SELECT 'shell' as component,
             'icon',
             'person'
         ),
-        json_object(
+        JSON_OBJECT(
             'title',
             'Logout',
             'link',

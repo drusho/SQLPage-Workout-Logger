@@ -1,21 +1,26 @@
 table_name: dimExercise
 description: "Dimension table storing the default, static attributes for every exercise available in the application."
-owner: "David R."
+created_at: "2025-06-02"
+updated_at: "2025-06-02"
+owner: "David Rusho"
 tags:
   - dimension
   - core
 columns:
-  - name: exerciseId
-    description: "The unique identifier for the exercise. Primary Key."
-    tests:
-      - unique
-      - not_null
+  - name: bodyGroup
+    description: "The primary body group targeted by the exercise, e.g., 'Chest', 'Back', 'Legs'."
+
   - name: exerciseName
     description: "The default, global name of the exercise."
     tests:
       - unique
       - not_null
-  - name: bodyGroup
-    description: "The primary body group targeted by the exercise, e.g., 'Chest', 'Back', 'Legs'."
+
+  - name: exerciseId
+    description: "The unique identifier for the exercise. Primary Key."
+    tests:
+      - unique
+      - not_null
+
   - name: equipmentNeeded
     description: "The equipment required to perform the exercise."

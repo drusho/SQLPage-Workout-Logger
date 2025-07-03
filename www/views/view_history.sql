@@ -1,86 +1,75 @@
 /**
  * @filename      view_history.sql
- * @description   Displays a high-level summary of workout logs, grouping all sets for a given exercise and day into a single line. This provides a user-friendly, aggregated view of the entire training history and serves as the main entry point for managing that history.
- * @created       2025-06-14
- * @last-updated  2025-07-02
- * @requires      - layouts/layout_main.sql: For the page shell and authentication.
- * @requires      - WorkoutLog, WorkoutSetLog, ExerciseLibrary (tables): To fetch and display the aggregated workout data.
+ * @description   Displays a high-level summary of workout logs, grouping all sets for a given exercise and day into a single line.
+ * @created       2025-06-18
+ * @last-updated  2025-07-03
+ * @requires      - `layouts/layout_main.sql` for the page shell and authentication.
+ * @requires      - `factWorkoutHistory`, `dimDate`, `dimExercise`, `dimUser` tables.
  * @returns       A full UI page containing a searchable and sortable table of the aggregated workout history.
- * @see           - /actions/action_edit_history.sql: The unified page for both creating new logs and editing existing ones.
- * @note          This page aggregates data from WorkoutSetLog into a single summary line using the GROUP_CONCAT function.
- * @note          The "Add Workout Log" button links to action_edit_history.sql without an ID parameter to enter "create" mode. The "Edit" link in each row links to the same file but passes a LogID to enter "edit" mode.
- * @todo          - Add server-side pagination to improve performance when the log history grows large.
- * @todo          - Implement advanced filtering options, such as by date range or by exercise.
+ * @see           - /actions/action_edit_history.sql: The page for editing a workout log.
  */
 ------------------------------------------------------
--- STEP 1: Include the main application layout and authentication check.
+-- STEP 1: RENDER PAGE STRUCTURE
 ------------------------------------------------------
 SELECT
     'dynamic' AS component,
     sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
 
-
-SELECT 'text' as component,
-    'Exericse History' as title,
-    'Exercise sets are grouped into a single line, see Summary header (**Set** x **Reps**: **Weight**)' as contents_md;
-    
-
-
 ------------------------------------------------------
--- STEP 2: Create the 'Add Exercise' Button
-------------------------------------------------------   
-
-SELECT 'button' as component,
-    'md' as size;
-SELECT '/actions/action_edit_history.sql' as link,
-    'green' as color,
-    'Add Exercise' as title,
-    'plus' as icon;
-
+-- STEP 2: RENDER PAGE HEADER AND ACTIONS
 ------------------------------------------------------
--- STEP 3: Create the table component.
-------------------------------------------------------   
 SELECT
-    'table' as component,
-    'Workout Logs' as title,
-    TRUE as sort,
-    TRUE as small,
-    json_array ('Action') as markdown;
+    'text' AS component,
+    'Workout History' AS title;
+
+-- The "Add Workout Log" button should link to the edit page without an ID to enter "create" mode.
+SELECT
+    'button' AS component,
+    'md' AS size;
+
+SELECT
+    '/actions/action_edit_history.sql' AS link,
+    'azure' AS outline,
+    'Add Workout Log' AS title,
+    'plus' AS icon;
 
 ------------------------------------------------------
--- STEP 4: Fetch and display the workout data.
--- This query joins workout logs with exercises and aggregates the data
--- from individual sets to display a summary for each workout.
-------------------------------------------------------      
+-- STEP 3: RENDER THE WORKOUT HISTORY LIST
+------------------------------------------------------
 SELECT
-    strftime ('%Y.%m.%d', wl.ExerciseTimestamp, 'unixepoch') AS "Date",
-    el.ExerciseAlias AS "Name",
-    CASE wsl.WeightUsed
-        WHEN 0 THEN GROUP_CONCAT (wsl.SetNumber || 'x' || wsl.RepsPerformed, ' - ')
-        ELSE GROUP_CONCAT (
-            wsl.SetNumber || 'x' || wsl.RepsPerformed || ':' || CAST(ROUND(wsl.WeightUsed) as INTEGER),
-            ' - '
-        )
-    END AS "Summary",
-    wl.PerformedAtStepNumber as Step,
-    wsl.RPE_Recorded as RPE,
-    wl.WorkoutNotes as Notes,
-    format (
-        '[Edit](/actions/action_edit_history.sql?id=%s)',
-        wl.LogID
+    'table' AS component,
+    'All Workouts' AS title,
+    TRUE AS sort,
+    TRUE AS small,
+    'Action' AS markdown;
+
+SELECT
+    d.fullDate AS "Date",
+    u.displayName AS "User",
+    e.exerciseName AS "Exercise",
+    -- Aggregate all sets for the workout into a single summary string
+    GROUP_CONCAT(
+        'Set ' || fwh.setNumber || ': ' || fwh.repsPerformed || 'x' || fwh.weightUsed || ' @' || fwh.rpeRecorded,
+        ' | '
+    ) AS "Sets",
+    -- Generate the Edit link for each workout session
+    FORMAT(
+        '[Edit](/actions/action_edit_history.sql?user_id=%s&exercise_id=%s&date_id=%s)',
+        fwh.userId,
+        fwh.exerciseId,
+        fwh.dateId
     ) AS "Action"
 FROM
-    WorkoutLog AS wl
-    JOIN ExerciseLibrary AS el ON wl.ExerciseID = el.ExerciseID
-    LEFT JOIN WorkoutSetLog AS wsl ON wl.LogID = wsl.LogID
-WHERE
-    wsl.RepsPerformed != ''
+    factWorkoutHistory AS fwh
+    JOIN dimDate AS d ON fwh.dateId = d.dateId
+    JOIN dimExercise AS e ON fwh.exerciseId = e.exerciseId
+    JOIN dimUser AS u ON fwh.userId = u.userId
 GROUP BY
-    wl.LogID
-    -- "Date"
-    -- "Name"
-    -- "Action",
-    -- "Step"
-    -- "RPE"
+    d.fullDate,
+    u.displayName,
+    e.exerciseName,
+    fwh.userId,
+    fwh.exerciseId,
+    fwh.dateId
 ORDER BY
-    wl.ExerciseTimestamp DESC;
+    d.fullDate DESC;

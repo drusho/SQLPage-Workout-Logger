@@ -1,6 +1,8 @@
 table_name: dimDate
 description: "A standard date dimension table for time-based analysis and reporting."
-owner: "David R."
+created_at: "2025-06-02"
+updated_at: "2025-06-03"
+owner: "David Rusho"
 tags:
   - dimension
   - core
