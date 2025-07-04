@@ -1,0 +1,80 @@
+{
+    "guest_menu": [
+        {
+            "title": "Log Workout",
+            "link": "/",
+            "icon": "activity"
+        },
+        {
+            "title": "History",
+            "link": "/views/view_history.sql",
+            "icon": "history"
+        },
+        {
+            "title": "Library",
+            "link": "/views/library.sql",
+            "icon": "books",
+            "submenu": [
+                {
+                    "title": "Exercise Catalog",
+                    "link": "/views/view_exercises.sql",
+                    "icon": "barbell"
+                },
+                {
+                    "title": "My Routines",
+                    "link": "/views/view_workouts.sql",
+                    "icon": "notebook"
+                }
+            ]
+        },
+        {
+            "title": "Login",
+            "link": "/auth/auth_login_form.sql",
+            "icon": "login"
+        },
+        {
+            "title": "Sign Up",
+            "link": "/auth/auth_signup_form.sql",
+            "icon": "user-plus"
+        }
+    ],
+    "user_menu": [
+        {
+            "title": "Log Workout",
+            "link": "/",
+            "icon": "activity"
+        },
+        {
+            "title": "History",
+            "link": "/views/view_history.sql",
+            "icon": "history"
+        },
+        {
+            "title": "Library",
+            "link": "/views/library.sql",
+            "icon": "books",
+            "submenu": [
+                {
+                    "title": "Exercise Catalog",
+                    "link": "/views/view_exercises.sql",
+                    "icon": "barbell"
+                },
+                {
+                    "title": "My Routines",
+                    "link": "/views/view_workouts.sql",
+                    "icon": "notebook"
+                }
+            ]
+        },
+        {
+            "title": "Settings",
+            "link": "/views/view_profile.sql",
+            "icon": "settings"
+        },
+        {
+            "title": "Logout",
+            "link": "/auth/auth_logout.sql",
+            "icon": "logout"
+        }
+    ]
+}

@@ -1,153 +1,185 @@
 /**
  * @filename      view_workouts.sql
- * @description   Displays a filterable list of all configured workouts. Allows enabling/disabling of workouts directly from the list.
- * @created       2025-06-16
- * @last-updated  2025-06-16
- * @requires      - The TemplateExerciseList table, which must have an `IsEnabled` column.
- * @param         action [url, optional] The action to perform ('enable' or 'disable').
- * @param         id [url, optional] The ID of the workout to act upon.
- * @param         template_filter [url, optional] The TemplateID to filter the list by.
- * @param         status_filter [url, optional] The status (1 for Enabled, 0 for Disabled) to filter by.
- * @param         prog_model_filter [url, optional] The ProgressionModelID to filter by.
- * @todo          - Preserve filter settings in the URL after enabling/disabling a workout.
+ * @description   Displays a filterable list of all exercise plans for the current user, allowing them to be enabled or disabled.
+ * @created       2025-06-18
+ * @last-updated  2025-07-03
+ * @requires      - `layouts/layout_main.sql` for the page shell and session variables.
+ * @requires      - `dimExercisePlan` and `dimExercise` tables.
+ * @returns       A UI page with a filterable list of the user's workout plans.
  */
 ------------------------------------------------------
--- STEP 1: HANDLE ACTIONS (ENABLE/DISABLE)
+-- Step 1: Load the main layout and get the current user's ID.
+------------------------------------------------------ 
+SELECT
+    'dynamic' AS component,
+    sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
+
+SET
+    current_user_id=(
+        SELECT
+            username
+        FROM
+            sessions
+        WHERE
+            session_token=sqlpage.cookie ('session_token')
+            AND expires_at>CURRENT_TIMESTAMP
+    );
+
 ------------------------------------------------------
-UPDATE TemplateExerciseList
-SET IsEnabled = 1
-WHERE TemplateExerciseListID = :id
-    AND :action = 'enable';
-UPDATE TemplateExerciseList
-SET IsEnabled = 0
-WHERE TemplateExerciseListID = :id
-    AND :action = 'disable';
-SELECT 'redirect' as component,
+-- Step 2: Handle Enable/Disable actions if an action parameter is present in the URL.
+------------------------------------------------------ 
+UPDATE dimExercisePlan
+SET
+    isActive=1
+WHERE
+    exercisePlanId=:enable_id
+    AND userId=$current_user_id;
+
+SELECT
+    'redirect' as component,
     '/views/view_workouts.sql' as link
-WHERE :action IS NOT NULL;
+WHERE
+    :enable_id IS NOT NULL;
+
+UPDATE dimExercisePlan
+SET
+    isActive=0
+WHERE
+    exercisePlanId=:disable_id
+    AND userId=$current_user_id;
+
+SELECT
+    'redirect' as component,
+    '/views/view_workouts.sql' as link
+WHERE
+    :disable_id IS NOT NULL;
+
 ------------------------------------------------------
--- STEP 2: RENDER PAGE STRUCTURE
-------------------------------------------------------
-SELECT 'dynamic' AS component,
-    sqlpage.run_sql('layouts/layout_main.sql') AS properties;
-------------------------------------------------------
--- STEP 3: RENDER PAGE HEADER AND ACTIONS
-------------------------------------------------------
-SELECT 'text' as component,
-    'My Workouts' as title;
-SELECT 'button' as component,
+-- Step 3: Display the page header and "Add Workout" button.
+------------------------------------------------------ 
+SELECT
+    'text' as component,
+    'Your Workout Plans' as title;
+
+SELECT
+    'button' as component,
     'md' as size;
-SELECT '/actions/action_add_workout.sql' as link,
-    'azure' as outline,
-    'Add Workout' as title,
+
+SELECT
+    '/actions/action_add_workout.sql' as link,
+    'green' as color,
+    'Add Workout Plan' as title,
     'plus' as icon;
+
 ------------------------------------------------------
--- STEP 4: RENDER THE FILTER FORM
-------------------------------------------------------
-SELECT 'form' as component,
+-- Step 4: Render the filter form.
+------------------------------------------------------ 
+SELECT
+    'form' as component,
     'view_workouts.sql' as action,
-    'true' as auto_submit;
--- 'get' as method;
--- Dropdown for Template
-SELECT 'select' as type,
+    true as auto_submit;
+
+-- Dropdown for Template Name
+SELECT
+    'select' as type,
     'template_filter' as name,
     'Filter by Template' as label,
-    'Select a template' as empty_option,
+    'Select a Template' as empty_option,
     :template_filter as value,
+    -- UPDATED: Use SELECT DISTINCT in a subquery to ensure unique template names.
     (
-        SELECT json_group_array(
-                json_object('label', TemplateName, 'value', TemplateID)
+        SELECT
+            JSON_GROUP_ARRAY(
+                JSON_OBJECT('label', T.templateName, 'value', T.templateName)
             )
-        FROM WorkoutTemplates
-        ORDER BY TemplateName
+        FROM
+            (
+                SELECT DISTINCT
+                    templateName
+                FROM
+                    dimExercisePlan
+                WHERE
+                    userId=$current_user_id
+                    AND templateName IS NOT NULL
+                ORDER BY
+                    templateName
+            ) AS T
     ) as options,
     4 as width;
+
 -- Dropdown for Status
-SELECT 'select' as type,
+SELECT
+    'select' as type,
     'status_filter' as name,
     'Filter by Status' as label,
-    'Select a status' as empty_option,
-    :status_filter as value,
-    -- FIX: The 'value' for each option is now a string ("1", "0") to match the URL parameter type.
-    json_array(
-        json_object('label', 'Enabled', 'value', '1'),
-        json_object('label', 'Disabled', 'value', '0')
+    'Select a Status' as empty_option,
+    -- :status_filter as value,
+    JSON_ARRAY(
+        JSON_OBJECT('label', 'Active', 'value', '1'),
+        JSON_OBJECT('label', 'Disabled', 'value', '0')
     ) as options,
-    3 as width;
--- Dropdown for Progression Model
-SELECT 'select' as type,
-    'prog_model_filter' as name,
-    'Filter by Model' as label,
-    'Select a model' as empty_option,
-    :prog_model_filter as value,
-    (
-        SELECT json_group_array(
-                json_object(
-                    'label',
-                    ProgressionModelName,
-                    'value',
-                    ProgressionModelID
-                )
-            )
-        FROM ProgressionModels
-        ORDER BY ProgressionModelName
-    ) as options,
-    3 as width;
--- This command ends the auto-submitting form.
--- FIX: Add a separate button to clear the filters. This is just a link to the page with no parameters.
-SELECT 'button' as component;
-select 'Clear Filters' as title,
+    4 as width;
+
+-- Button to clear filters
+SELECT
+    'button' as component,
+    2 as width;
+
+SELECT
+    'Clear Filters' as title,
     '/views/view_workouts.sql' as link,
     'outline' as style,
-    'yellow' as outline,
-    'restore' as icon;
+    'yellow' as outline_color,
+    'restore' as icon,
+    'sm' as size;
+
 ------------------------------------------------------
--- STEP 5: RENDER THE WORKOUTS LIST
-------------------------------------------------------
-SELECT 'table' as component,
-    'Configured Workouts' as title,
+-- Step 5: Display the table of workout plans.
+------------------------------------------------------ 
+SELECT
+    'table' as component,
+    'All Plans' as title,
     TRUE as sort,
     TRUE as small,
-    json_array('Status', 'Action') as markdown;
-SELECT wt.TemplateName AS "Template",
-    tel.ExerciseAlias AS "Workout Name (Alias)",
-    el.ExerciseName AS "Base Exercise",
-    CASE
-        WHEN tel.IsEnabled = 1 THEN format(
-            '[✅ Enabled](/views/view_workouts.sql?action=disable&id=%s)',
-            tel.TemplateExerciseListID
-        )
-        ELSE format(
-            '[❌ Disabled](/views/view_workouts.sql?action=enable&id=%s)',
-            tel.TemplateExerciseListID
-        )
+    'Action' as markdown;
+
+-- Select all exercise plans for the current user, applying filters.
+SELECT
+    plan.templateName AS "Template",
+    ex.exerciseName AS "Exercise",
+    plan.currentStepNumber AS "Current Step",
+    CASE plan.isActive
+        WHEN 1 THEN 'Active'
+        ELSE 'Disabled'
     END AS "Status",
-    pm.ProgressionModelName AS "Progression Model",
-    format(
+    CASE plan.isActive
+        WHEN 1 THEN FORMAT(
+            '[Disable](/views/view_workouts.sql?disable_id=%s)',
+            plan.exercisePlanId
+        )
+        ELSE FORMAT(
+            '[Enable](/views/view_workouts.sql?enable_id=%s)',
+            plan.exercisePlanId
+        )
+    END||' | '||FORMAT(
         '[Edit](/actions/action_edit_workout.sql?id=%s)',
-        wt.TemplateID
-    ) || ' | ' || format(
-        '[Delete](/views/delete_workout.sql?id=%s)',
-        tel.TemplateExerciseListID
+        plan.exercisePlanId
     ) AS "Action"
-FROM TemplateExerciseList AS tel
-    JOIN WorkoutTemplates AS wt ON tel.TemplateID = wt.TemplateID
-    JOIN ExerciseLibrary AS el ON tel.ExerciseID = el.ExerciseID
-    LEFT JOIN ProgressionModels AS pm ON tel.ProgressionModelID = pm.ProgressionModelID
-WHERE (
-        tel.TemplateID = :template_filter
+FROM
+    dimExercisePlan AS plan
+    JOIN dimExercise AS ex ON plan.exerciseId=ex.exerciseId
+WHERE
+    plan.userId=$current_user_id
+    AND (
+        plan.templateName=:template_filter
         OR :template_filter IS NULL
-        OR :template_filter = ''
+        OR :template_filter=''
     )
     AND (
-        tel.IsEnabled = :status_filter
+        plan.isActive=:status_filter
         OR :status_filter IS NULL
-        OR :status_filter = ''
+        OR :status_filter=''
     )
-    AND (
-        COALESCE(tel.ProgressionModelID, '') = :prog_model_filter
-        OR :prog_model_filter IS NULL
-        OR :prog_model_filter = ''
-    )
-ORDER BY wt.TemplateName,
-    tel.OrderInWorkout;
+ORDER BY
+    plan.templateName,
+    ex.exerciseName;

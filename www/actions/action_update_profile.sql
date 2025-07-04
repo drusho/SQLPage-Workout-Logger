@@ -1,53 +1,35 @@
 /**
  * @filename      action_update_profile.sql
- * @description   Processes a form submission to update a user's profile information.
- * It uses the session cookie to identify the logged-in user and
- * updates their record in the `users` table with the new data.
- * @created       2025-06-14
- * @last-updated  2025-06-15
- * @requires      - The `sessions` table to identify the current user.
- * @requires      - The `users` table, which this script updates.
- * @param         sqlpage.cookie('session_token') [cookie] The user's session identifier.
- * @param         display_name [form] The new display name submitted by the user.
- * @param         profile_picture_url [form] The new URL for the user's profile picture.
- * @param         bio [form] The new biography text for the user's profile.
- * @returns       A `redirect` component that sends the user back to their profile page,
- * displaying a success notification upon completion.
- * @see           `profile.sql` - The page that contains the form that initiates this action.
- * @note          This action requires an active user session to function correctly.
- * @todo          - Add server-side validation for input lengths (e.g., bio character limit).
- * @todo          - Implement a check to ensure a user session is valid before the `UPDATE`
- * and show an error message if the session is invalid or expired.
+ * @description   Handles the form submission from the profile page to update a
+ * user's display name and timezone.
+ * @created       2025-06-18
+ * @last-updated  2025-07-03
+ * @requires      - The `dimUser` and `sessions` tables.
+ * @param         displayName [form] The user's new desired display name.
+ * @param         timezone    [form] The user's new desired timezone.
+ * @redirects-to  The profile page with a success message.
  */
--- Add this block at the top of any page that saves data.
--- It will check if a user is logged in. If not, it redirects them.
-SET current_user = (
-        SELECT username
-        FROM sessions
-        WHERE session_token = sqlpage.cookie('session_token')
+-- Step 1: Get the current user's ID from their session cookie.
+SET
+    user_id_to_update = (
+        SELECT
+            username
+        FROM
+            sessions
+        WHERE
+            session_token = sqlpage.cookie ('session_token')
+            AND expires_at > CURRENT_TIMESTAMP
     );
-SELECT 'redirect' AS component,
-    '/auth/auth_guest_prompt.sql' AS link
-WHERE $current_user IS NULL;
---------------------------------------------------------------------
--- STEP 1: Get the current user's username from their session cookie
---------------------------------------------------------------------
-SET current_user = (
-        SELECT username
-        FROM sessions
-        WHERE session_token = sqlpage.cookie('session_token')
-    );
------------------------------------------------------------------
--- STEP 2 : Update the user's profile information in the database
------------------------------------------------------------------
-UPDATE users
-SET display_name = :display_name,
-    profile_picture_url = :profile_picture_url,
-    bio = :bio,
+
+-- Step 2: Update the user's record in the dimUser table with the new information.
+UPDATE dimUser
+SET
+    displayName = :displayName,
     timezone = :timezone
-WHERE username = $current_user;
--------------------------------------------------------------------
--- STEP 3: Redirect back to the profile page with a success message
--------------------------------------------------------------------
-SELECT 'redirect' as component,
-       '/views/view_profile.sql' AS link;
+WHERE
+    userId = $user_id_to_update;
+
+-- Step 3: Redirect back to the profile page with a success message.
+SELECT
+    'redirect' as component,
+    '/views/view_profile.sql?message=Your profile has been updated successfully.' as link;

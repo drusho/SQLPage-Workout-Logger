@@ -1,125 +1,57 @@
--- File: www/layouts/layout_main.sql (Final Corrected Version)
--- Description: The main application shell. Handles session validation and builds
--- the navigation menu dynamically based on the user's login status.
--- Step 1: Get the current user's ID and display name from the session cookie.
--- These variables will be NULL if the user is not logged in.
+/**
+ * @filename      layout_main.sql
+ * @description   The main application shell. It handles session validation and
+ * dynamically builds the navigation menu from an external JSON file.
+ * @created       2025-07-03
+ * @last-updated  2025-07-03
+ * @requires      - `assets/navigation.json` to define the menu structure.
+ * @requires      - `sessions` and `dimUser` tables for authentication.
+ */
+-- Step 1: Get the current user's ID and display name. These will be NULL if not logged in.
 SET
-    current_user_id = (
+    current_user_id=(
         SELECT
             username
         FROM
             sessions
         WHERE
-            session_token = sqlpage.cookie ('session_token')
-            AND expires_at > CURRENT_TIMESTAMP
+            session_token=sqlpage.cookie ('session_token')
+            AND expires_at>CURRENT_TIMESTAMP
     );
 
 SET
-    current_user_display_name = (
+    current_user_display_name=(
         SELECT
             displayName
         FROM
             dimUser
         WHERE
-            userId = $current_user_id
+            userId=$current_user_id
     );
 
--- Step 2: Define the main application shell and dynamically build the navigation menu.
+-- Step 2: Read the navigation configuration file into a variable.
+SET
+    nav_config=sqlpage.read_file_as_text ('assets/navigation.json');
+
+-- Step 3: Define the main application shell and dynamically build the navigation menu.
 SELECT
     'shell' AS component,
     'Workout Logger' AS title,
-    'run-fast' as icon,
+    'barbell' as icon,
     '/' AS link,
     'en-US' as lang,
     'auto' as theme,
-    -- Use a CASE statement to build the correct JSON for the menu based on login status.
+    '/assets/custom_form_layout.css' as css,
+    -- Use a CASE statement to select the correct menu and personalize it.
     CASE
         WHEN $current_user_id IS NOT NULL THEN
-        -- If the user is logged in, show this menu:
-        JSON_ARRAY(
-            JSON_OBJECT(
-                'title',
-                'Workouts',
-                'link',
-                '/',
-                'icon',
-                'activity'
-            ),
-            JSON_OBJECT(
-                'title',
-                'History',
-                'link',
-                '/views/view_history.sql',
-                'icon',
-                'history'
-            ),
-            JSON_OBJECT(
-                'title',
-                'Exercises',
-                'link',
-                '/views/view_exercises.sql',
-                'icon',
-                'weight'
-            ),
-            JSON_OBJECT(
-                'title',
-                $current_user_display_name,
-                'link',
-                '/views/view_profile.sql',
-                'icon',
-                'user-circle'
-            ),
-            JSON_OBJECT(
-                'title',
-                'Logout',
-                'link',
-                '/auth/auth_logout.sql',
-                'icon',
-                'logout'
-            )
+        -- For logged-in users, get the user_menu and replace the placeholder with their name.
+        REPLACE(
+            JSON_EXTRACT($nav_config, '$.user_menu'),
+            '"PROFILE_PLACEHOLDER"',
+            '"'||$current_user_display_name||'"'
         )
         ELSE
-        -- If the user is a guest, show this menu:
-        JSON_ARRAY(
-            JSON_OBJECT(
-                'title',
-                'Workouts',
-                'link',
-                '/',
-                'icon',
-                'activity'
-            ),
-            JSON_OBJECT(
-                'title',
-                'History',
-                'link',
-                '/views/view_history.sql',
-                'icon',
-                'history'
-            ),
-            JSON_OBJECT(
-                'title',
-                'Exercises',
-                'link',
-                '/views/view_exercises.sql',
-                'icon',
-                'weight'
-            ),
-            JSON_OBJECT(
-                'title',
-                'Login',
-                'link',
-                '/auth/auth_login_form.sql',
-                'icon',
-                'login'
-            ),
-            JSON_OBJECT(
-                'title',
-                'Sign Up',
-                'link',
-                '/auth/auth_signup_form.sql',
-                'icon',
-                'user-plus'
-            )
-        )
+        -- For guests, just use the guest_menu as-is.
+        JSON_EXTRACT($nav_config, '$.guest_menu')
     END as menu_item;
