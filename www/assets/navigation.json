@@ -24,6 +24,11 @@
                     "title": "My Routines",
                     "link": "/views/view_workouts.sql",
                     "icon": "notebook"
+                },
+                {
+                    "title": "Progression Builder",
+                    "link": "/views/view_progression_models.sql",
+                    "icon": "stairs"
                 }
             ]
         },
@@ -63,6 +68,11 @@
                     "title": "My Routines",
                     "link": "/views/view_workouts.sql",
                     "icon": "notebook"
+                },
+                {
+                    "title": "Progression Builder",
+                    "link": "/views/view_progression_models.sql",
+                    "icon": "stairs"
                 }
             ]
         },

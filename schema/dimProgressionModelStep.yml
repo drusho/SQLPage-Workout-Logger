@@ -1,0 +1,43 @@
+table_name: dimProgressionModelStep
+description: "Stores the specific details for each step (e.g., week) within a progression model, defining the workout parameters for that period."
+created_at: "2025-06-04"
+updated_at: "2025-06-04"
+owner: "David Rusho"
+tags:
+  - dimension
+  - progression
+columns:
+  - name: description
+    description: "A user-provided description for the step, e.g., '75% of 1RM' or 'Accumulation Phase'."
+    tests: []
+
+  - name: percentOfMax
+    description: "The percentage (as a decimal, e.g., 0.75) of 1RM (for 'weight' models) or Max Reps (for 'reps' models) to use for this step."
+    tests: []
+
+  - name: progressionModelId
+    description: "Foreign Key referencing the parent progression model this step belongs to."
+    tests:
+      - not_null
+      - relationships:
+          to: dimProgressionModel
+          field: progressionModelId
+
+  - name: progressionModelStepId
+    description: "The unique identifier for a single step within a model. Primary Key."
+    tests:
+      - unique
+      - not_null
+
+  - name: stepNumber
+    description: "The order of this step within the model (e.g., 1, 2, 3 for Week 1, 2, 3)."
+    tests:
+      - not_null
+
+  - name: targetReps
+    description: "The target number of reps to perform in this step."
+    tests: []
+
+  - name: targetSets
+    description: "The target number of sets to perform in this step."
+    tests: []

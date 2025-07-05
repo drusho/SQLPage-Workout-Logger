@@ -59,7 +59,7 @@ WHERE
 ------------------------------------------------------ 
 SELECT
     'text' as component,
-    'Your Workout Plans' as title;
+    'Workout Plans' as title;
 
 SELECT
     'button' as component,

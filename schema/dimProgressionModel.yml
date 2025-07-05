@@ -1,0 +1,38 @@
+table_name: dimProgressionModel
+description: "Stores the high-level details of a user-defined progression model, such as its name and type (weight-based or reps-based)."
+created_at: "2025-06-04"
+updated_at: "2025-06-04"
+owner: "David Rusho"
+tags:
+  - dimension
+  - progression
+columns:
+  - name: description
+    description: "A user-provided description of the model's purpose or methodology."
+    tests: []
+
+  - name: progressionModelId
+    description: "The unique identifier for the progression model. Primary Key."
+    tests:
+      - unique
+      - not_null
+
+  - name: modelName
+    description: "The user-defined name for the progression model (e.g., '5x5 Linear Progression')."
+    tests:
+      - not_null
+
+  - name: modelType
+    description: "The type of progression, which determines the calculation method. Either 'weight' or 'reps'."
+    tests:
+      - not_null
+      - accepted_values:
+          values: ["weight", "reps"]
+
+  - name: userId
+    description: "Foreign Key referencing the user who created this model."
+    tests:
+      - not_null
+      - relationships:
+          to: dimUser
+          field: userId
