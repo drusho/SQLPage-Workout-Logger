@@ -7,7 +7,9 @@
  * @param         id [url, optional] The ID of the progression model to edit. If absent, the page enters "create" mode.
  * @param         action [form] The action to perform (e.g., 'create_model', 'update_details').
  */
+ ------------------------------------------------------
 -- Step 1: Get current user ID.
+------------------------------------------------------
 SET
     current_user_id=(
         SELECT
@@ -18,8 +20,10 @@ SET
             session_token=sqlpage.cookie ('session_token')
     );
 
+------------------------------------------------------
 -- Step 2: Handle all incoming POST actions before rendering any page content.
 -- Action to CREATE a new progression model.
+------------------------------------------------------
 SET
     new_model_id=HEX(RANDOMBLOB(16));
 
@@ -74,7 +78,10 @@ WHERE
 -- =============================================================================
 -- Page Rendering Logic (only runs on GET requests)
 -- =============================================================================
+
+------------------------------------------------------
 -- Step 3: Load the main layout.
+------------------------------------------------------
 SELECT
     'dynamic' AS component,
     sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
@@ -155,7 +162,10 @@ WHERE
 -- "EDIT" MODE RENDER
 -- This section renders the full editor if an ID is present in the URL.
 --------------------------------------------------------------------------------
+
+------------------------------------------------------
 -- Step 5: Fetch all data for the model.
+------------------------------------------------------
 SET
     model=(
         SELECT
@@ -174,7 +184,9 @@ SET
             AND userId=$current_user_id
     );
 
+------------------------------------------------------
 -- Step 6: Display the page header.
+------------------------------------------------------
 SELECT
     'title' as component,
     'Edit Progression Model: '||JSON_EXTRACT($model, '$.modelName') as contents,
@@ -182,7 +194,9 @@ SELECT
 WHERE
     $id IS NOT NULL;
 
+------------------------------------------------------
 -- Step 7: Display the form to edit the main model details.
+------------------------------------------------------
 SELECT
     'form' as component,
     'post' as method,
@@ -242,7 +256,9 @@ SELECT
 WHERE
     $id IS NOT NULL;
 
+------------------------------------------------------
 -- Step 8: Display the table of progression steps.
+------------------------------------------------------
 SELECT
     'divider' as component
 WHERE
@@ -274,7 +290,9 @@ WHERE
 ORDER BY
     stepNumber;
 
+------------------------------------------------------
 -- Step 9: Display a button to edit the steps in the bulk editor.
+------------------------------------------------------
 SELECT
     'button' as component,
     'md' as size

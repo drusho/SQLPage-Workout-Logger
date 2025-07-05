@@ -1,127 +1,262 @@
 /**
  * @filename      action_edit_exercise.sql
- * @description   A self-submitting page that displays a form pre-filled with an exercise's current data and processes the UPDATE submission.
- * @created       2025-06-15
- * @last-updated  2025-06-18
- * @requires      - layouts/layout_main.sql: Provides the main UI shell and handles user authentication.
- * @requires      - ExerciseLibrary (table): The source for the exercise data and the target for the UPDATE statement.
- * @requires      - sessions (table): Used to identify the current user and protect the page from guest access.
- * @param         $id [url] The ExerciseID of the record to be edited, passed in the URL on the initial GET request.
- * @param         action [form] A hidden field with the value 'update_exercise' that triggers the UPDATE logic on POST.
- * @param         id [form] A hidden field containing the ExerciseID to update, passed during the POST request.
- * @param         name [form] The new name for the exercise.
- * @param         alias [form, optional] The new alias for the exercise.
- * @param         equipment [form, optional] The new equipment needed for the exercise.
- * @param         body_group [form, optional] The new body group for the exercise.
- * @returns       On a GET request, returns a UI page with the pre-filled form. On a successful POST, returns a redirect component.
- * @see           - /views/view_exercises.sql: The page that links to this edit page and is the destination after a successful update.
- * @note          This script follows the Post-Redirect-Get (PRG) pattern. An authentication check is performed at the start.
- * @note          Each form field is pre-populated by running its own individual query against the database.
+ * @description   A self-submitting page for creating, editing, and deleting an exercise in the catalog.
+ * @created       2025-07-05
+ * @last-updated  2025-07-05
+ * @requires      - `layouts/layout_main.sql` for the page shell.
+ * @requires      - `dimExercise`, `dimUserExercisePreferences`, `sessions` tables.
+ * @param         id [url, optional] The exerciseId to edit. If absent, the page is in "create" mode.
+ * @param         action [form] The action to perform ('create', 'update').
+ * @param         action2 [form] The action to perform for deletion ('delete').
  */
- ----------------------------------------------------
--- Step 0: Authentication Guard
--- This block protects the action from being executed by unauthenticated users.
-----------------------------------------------------
-SET current_user = (
-        SELECT username
-        FROM sessions
-        WHERE session_token = sqlpage.cookie('session_token')
+------------------------------------------------------
+-- Step 1: Get the current user's ID from the session cookie.
+------------------------------------------------------
+SET
+    current_user_id=(
+        SELECT
+            username
+        FROM
+            sessions
+        WHERE
+            session_token=sqlpage.cookie ('session_token')
     );
-SELECT 'redirect' AS component,
-    '/auth/auth_guest_prompt.sql' AS link
-WHERE $current_user IS NULL;
+
 ------------------------------------------------------
--- STEP 1: Process Form Submission (POST Request)
--- This block executes only when the page receives a POST request from the form submission.
+-- Step 2: Handle incoming POST requests for creating, updating, and deleting exercises.
+-- This section follows the Post-Redirect-Get pattern, where any POST action
+-- results in a redirect, preventing duplicate submissions on page refresh.
 ------------------------------------------------------
--- This UPDATE statement applies the submitted form data to the correct database record.
--- It also updates the timestamp to reflect the latest modification.
-UPDATE ExerciseLibrary
-SET ExerciseName = :name,
-    ExerciseAlias = :alias,
-    BodyGroup = :body_group,
-    EquipmentType = :equipment,
-    LastModified = strftime('%Y-%m-%d %H:%M:%S', 'now')
-WHERE ExerciseID = :id
-    AND :action = 'update_exercise';
--- After a successful update, redirect back to the main list.
-SELECT 'redirect' as component,
-    '/views/view_exercises.sql' as link
-WHERE :action = 'update_exercise';
+
+-- Action to CREATE a new exercise.
+SET
+    new_exercise_id=HEX(RANDOMBLOB(16));
+
+INSERT INTO
+    dimExercise (
+        exerciseId,
+        exerciseName,
+        bodyGroup,
+        equipmentNeeded
+    )
+SELECT
+    $new_exercise_id,
+    :exerciseName,
+    :bodyGroup,
+    :equipmentNeeded
+WHERE
+    :action='create';
+
+-- After creating, set the user's alias for the new exercise if provided.
+INSERT OR IGNORE INTO
+    dimUserExercisePreferences (userId, exerciseId, userExerciseAlias)
+SELECT
+    $current_user_id,
+    $new_exercise_id,
+    :userExerciseAlias
+WHERE
+    :action='create'
+    AND :userExerciseAlias IS NOT NULL
+    AND :userExerciseAlias!='';
+
+-- Action to UPDATE an existing exercise.
+-- (Update and Delete logic is included but not the focus of this debug)
+UPDATE dimExercise
+SET
+    exerciseName=:exerciseName,
+    bodyGroup=:bodyGroup,
+    equipmentNeeded=:equipmentNeeded
+WHERE
+    exerciseId=:id
+    AND :action='update';
+
+DELETE FROM dimUserExercisePreferences
+WHERE
+    userId=$current_user_id
+    AND exerciseId=:id
+    AND :action='update';
+
+INSERT INTO
+    dimUserExercisePreferences (userId, exerciseId, userExerciseAlias)
+SELECT
+    $current_user_id,
+    :id,
+    :userExerciseAlias
+WHERE
+    :action='update'
+    AND :userExerciseAlias IS NOT NULL
+    AND :userExerciseAlias!='';
+
+
+DELETE FROM dimUserExercisePreferences
+WHERE
+    exerciseId=:id
+    AND :action2='delete';
+
+DELETE FROM factWorkoutHistory
+WHERE
+    exerciseId=:id
+    AND :action2='delete';
+
+DELETE FROM dimExercisePlan
+WHERE
+    exerciseId=:id
+    AND :action2='delete';
+
+DELETE FROM dimExercise
+WHERE
+    exerciseId=:id
+    AND :action2='delete';
+
+-- Redirect the user after any POST action.
+SELECT
+    'redirect' as component,
+    '/views/view_exercises.sql?message=Exercise+created' as link
+WHERE
+    :action='create';
+
+SELECT
+    'redirect' as component,
+    '/views/view_exercises.sql?message=Exercise+updated' as link
+WHERE
+    :action='update';
+
+SELECT
+    'redirect' as component,
+    '/views/view_exercises.sql?message=Exercise+deleted' as link
+WHERE
+    :action2='delete';
+-- =============================================================================
+-- Page Rendering Logic (only runs on GET requests)
+-- =============================================================================
 ------------------------------------------------------
--- STEP 2: Render Page Skeleton (GET Request)
--- This block sets up the main page structure and title on an initial page load.
+-- Step 3: Load the main layout. This will only run if no redirect occurred.
 ------------------------------------------------------
--- Load the main layout, which includes the navigation menu and footer.
-SELECT 'dynamic' AS component,
-    sqlpage.run_sql('layouts/layout_main.sql') AS properties;
--- Display a dynamic page title using the name of the exercise being edited.
-SELECT 'text' as component,
-    'Edit Exercise: ' || (
-        SELECT ExerciseName
-        FROM ExerciseLibrary
-        WHERE ExerciseID = $id
-    ) as title;
+SELECT
+    'dynamic' AS component,
+    sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
+
 ------------------------------------------------------
--- STEP 3: Render Edit Form (GET Request)
--- This block defines the data entry form. Each field runs a separate query
--- to pre-fill its value with the exercise's current data.
+-- Step 4: Fetch existing exercise data into a JSON object if we are in "Edit" mode.
 ------------------------------------------------------
--- Define the main <form> element.
-SELECT 'form' as component,
-    'action_edit_exercise.sql' as action,
+SET
+    exercise_data=(
+        SELECT
+            JSON_OBJECT(
+                'exerciseName',
+                de.exerciseName,
+                'bodyGroup',
+                de.bodyGroup,
+                'equipmentNeeded',
+                de.equipmentNeeded,
+                'userAlias',
+                duep.userExerciseAlias
+            )
+        FROM
+            dimExercise AS de
+            LEFT JOIN dimUserExercisePreferences AS duep ON de.exerciseId=duep.exerciseId
+            AND duep.userId=$current_user_id
+        WHERE
+            de.exerciseId=$id
+    );
+
+------------------------------------------------------
+-- Step 5: Display the page header, which changes based on create or edit mode.
+------------------------------------------------------
+SELECT
+    'text' as component,
+    CASE
+        WHEN $id IS NULL THEN 'Add New Exercise'
+        ELSE 'Edit Exercise'
+    END as title;
+
+------------------------------------------------------
+-- Step 6: Display the main form for adding or editing exercise details.
+------------------------------------------------------
+SELECT
+    'form' as component,
     'post' as method,
-    'green' as validate_color,
-    'Update Exercise' as validate,
-    'Clear' as reset;
--- Define hidden fields to pass the 'action' and the 'id' to the processing script.
-SELECT 'hidden' as type,
-    'update_exercise' as value,
-    'action' as name;
-SELECT 'hidden' as type,
-    $id as value,
-    'id' as name;
--- Define the visible form fields, pre-filling each with a direct query.
-SELECT 'text' as type,
-    'name' as name,
+    CASE
+        WHEN $id IS NULL THEN 'Create Exercise'
+        ELSE 'Update Exercise'
+    END as validate,
+    'green' as validate_color;
+
+SELECT
+    'hidden' as type,
+    'action' as name,
+    CASE
+        WHEN $id IS NULL THEN 'create'
+        ELSE 'update'
+    END as value;
+
+SELECT
+    'hidden' as type,
+    'id' as name,
+    $id as value
+WHERE
+    $id IS NOT NULL;
+
+SELECT
+    'text' as type,
+    'exerciseName' as name,
     'Exercise Name' as label,
-    TRUE as required,
-    ExerciseName as value
-FROM ExerciseLibrary
-WHERE ExerciseID = $id;
-SELECT 'text' as type,
-    'alias' as name,
-    'Alias' as label,
-    ExerciseAlias as value
-FROM ExerciseLibrary
-WHERE ExerciseID = $id;
-SELECT 'text' as type,
-    'equipment' as name,
-    'Equipment' as label,
-    EquipmentType as value
-FROM ExerciseLibrary
-WHERE ExerciseID = $id;
-SELECT 'select' as type,
-    'body_group' as name,
+    JSON_EXTRACT($exercise_data, '$.exerciseName') as value,
+    TRUE as required;
+
+SELECT
+    'text' as type,
+    'userExerciseAlias' as name,
+    'Your Alias (Optional)' as label,
+    JSON_EXTRACT($exercise_data, '$.userAlias') as value;
+
+SELECT
+    'text' as type,
+    'bodyGroup' as name,
     'Body Group' as label,
-    BodyGroup as value,
-    (
-        SELECT json_group_array(
-                json_object('label', BodyGroup, 'value', BodyGroup)
-            )
-        FROM (
-                SELECT DISTINCT BodyGroup
-                FROM ExerciseLibrary
-                WHERE BodyGroup IS NOT NULL
-                ORDER BY BodyGroup
-            )
-    ) as options
-FROM ExerciseLibrary
-WHERE ExerciseID = $id;
--- Define a standalone 'Cancel' button that links back to the main exercise list.
-SELECT 'button' as component;
--- 'outline' as style;
-SELECT 'Cancel' as title,
-    '/views/view_exercises.sql' as link,
-    'cancel' as icon,
-    'yellow' as outline;
+    JSON_EXTRACT($exercise_data, '$.bodyGroup') as value;
+
+SELECT
+    'text' as type,
+    'equipmentNeeded' as name,
+    'Equipment Needed' as label,
+    JSON_EXTRACT($exercise_data, '$.equipmentNeeded') as value;
+
+------------------------------------------------------
+-- Step 7: Display the "Delete" form, but only when in "Edit" mode.
+------------------------------------------------------
+SELECT
+    'divider' as component
+WHERE
+    $id IS NOT NULL;
+
+select
+    'form' as component,
+    'form-delete-exercise' as id,
+    '' as validate
+WHERE
+    $id IS NOT NULL;
+
+SELECT
+    'hidden' as type,
+    'action2' as name,
+    'delete' as value;
+
+SELECT
+    'hidden' as type,
+    'id' as name,
+    $id as value;
+
+select
+    'button' as component
+WHERE
+    $id IS NOT NULL;
+
+SELECT
+    '?action2=delete' as link,
+    'form-delete-exercise' as form,
+    'Delete Exercise' as title,
+    'red' as color,
+    'trash' as icon
+WHERE
+    $id IS NOT NULL;

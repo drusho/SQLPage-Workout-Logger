@@ -21,7 +21,9 @@ SET
             session_token=sqlpage.cookie ('session_token')
     );
 
+------------------------------------------------------
 -- Step 2: Display the page header and "Add" button.
+
 SELECT
     'text' as component,
     'Progression Model Library' as title;
@@ -41,7 +43,9 @@ SELECT
     'Add Model' as title,
     'plus' as icon;
 
+------------------------------------------------------
 -- Step 3: Display the table of existing progression models.
+------------------------------------------------------
 SELECT
     'divider' as component;
 
