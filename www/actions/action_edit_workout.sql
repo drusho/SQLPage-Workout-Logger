@@ -1,184 +1,181 @@
 /**
  * @filename      action_edit_workout.sql
- * @description   A page for managing the exercises and their assigned progression models within a single workout routine.
- * @created       2025-07-04
- * @last-updated  2025-07-04
- * @requires      - `layouts/layout_main.sql` for the page shell.
- * @requires      - All `dim` tables for fetching and updating plan data.
- * @param         id [url] The exercisePlanId that was clicked to identify the routine.
- * @param         action [form] The action to perform (e.g., 'remove_exercise', 'add_exercise', 'update_progression').
- * @param         plan_id [form] The ID of the exercise plan record to modify or remove.
- * @param         exercise_id [form] The ID of the exercise to add to the routine.
- * @param         progression_model_id [form] The ID of the progression model to assign.
+ * @description   A page for managing a workout routine's name, exercises, and progression models.
+ * @created       2025-07-06
+ * @requires      - layouts/layout_main.sql
+ * @requires      - All dim tables.
+ * @param         template_id [url] The unique ID of the workout routine to edit.
+ * @param         action [form] The action to perform (e.g., remove_exercise, add_exercise, update_progression, update_details).
  */
--- Step 1: Get current user ID.
-SET
-    current_user_id=(
-        SELECT
-            username
-        FROM
-            sessions
-        WHERE
-            session_token=sqlpage.cookie ('session_token')
-    );
 
--- Step 2: Handle all incoming form actions BEFORE rendering any page content.
--- Action to remove an exercise from the routine.
+-- =============================================================================
+-- Step 1: Handle all POST actions before rendering the page.
+-- =============================================================================
+SET current_user_id = (SELECT username FROM sessions WHERE session_token = sqlpage.cookie('session_token'));
+
+-- Action: Update the plan's main details
+UPDATE dimExercisePlan SET
+    templateName = :new_template_name,
+    userTemplateAlias = :user_template_alias
+WHERE
+    templateId = :template_id AND userId = $current_user_id AND :action = 'update_details';
+
+-- Action: Remove an exercise from the routine
 DELETE FROM dimExercisePlan
 WHERE
-    exercisePlanId=:plan_id
-    AND userId=$current_user_id
-    AND :action='remove_exercise';
+    exercisePlanId = :plan_id AND userId = $current_user_id AND :action = 'remove_exercise';
 
--- Action to add a new exercise to the routine.
-INSERT INTO
-    dimExercisePlan (
-        exercisePlanId,
-        userId,
-        exerciseId,
-        templateName,
-        isActive,
-        currentStepNumber
-    )
+-- Action: Update the progression model for a single exercise
+UPDATE dimExercisePlan SET
+    progressionModelId = NULLIF(:progression_model_id, '')
+WHERE
+    exercisePlanId = :plan_id AND userId = $current_user_id AND :action = 'update_progression';
+
+-- Action: Add a new exercise to the routine
+INSERT INTO dimExercisePlan (exercisePlanId, userId, exerciseId, templateName, templateId, isActive, currentStepNumber)
 SELECT
     HEX(RANDOMBLOB(16)),
     $current_user_id,
     :exercise_id,
     :template_name,
+    :template_id,
     1,
     1
 WHERE
-    :action='add_exercise';
+    :action = 'add_exercise';
 
--- Action to update the assigned progression model for an exercise.
-UPDATE dimExercisePlan
-SET
-    progressionModelId=:progression_model_id
-WHERE
-    exercisePlanId=:plan_id
-    AND userId=$current_user_id
-    AND :action='update_progression';
+-- After any POST action, redirect back to the same edit page to show the changes
+SELECT 'redirect' AS component, '/actions/action_edit_workout.sql?template_id=' || :template_id AS link
+WHERE :action IS NOT NULL;
 
--- After any action, redirect back to the correct edit page using the plan_id to find the template name.
-SET
-    redirect_template_name=(
-        SELECT
-            templateName
-        FROM
-            dimExercisePlan
-        WHERE
-            exercisePlanId=:plan_id
-    );
 
--- SELECT
---     'redirect' as component,
---     FORMAT(
---         '/actions/action_edit_workout.sql?template_name=%s',
---         $redirect_template_name
---     ) as link
--- WHERE
---     :action IS NOT NULL;
+-- =============================================================================
+-- Step 2: Render the page content for GET requests.
+-- =============================================================================
 
--- Step 3: Load layout and get the template name from the URL ID.
-SELECT
-    'dynamic' AS component,
-    sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
+-- Load layout
+SELECT 'dynamic' AS component, sqlpage.run_sql('layouts/layout_main.sql') AS properties;
 
-SET
-    template_name=(
-        SELECT
-            templateName
-        FROM
-            dimExercisePlan
-        WHERE
-            exercisePlanId=$id
-            AND userId=$current_user_id
-    );
+-- Get the template ID and current name from the URL
+SET template_id = $template_id;
+SET template_name = (SELECT MIN(templateName) FROM dimExercisePlan WHERE templateId = $template_id);
 
--- Step 4: Validate that a valid routine was found for the user.
--- SELECT
---     'redirect' as component,
---     '/views/view_workouts.sql?error=Routine+not+found' as link
--- WHERE
---     $template_name IS NULL;
+-- Display page header
+SELECT 'text' AS component, 'Edit Routine: ' || $template_name AS title, 3 as level;
 
--- Step 5: Display the page header.
-SELECT
-    'text' as component,
-    'Edit Routine: '||$template_name as title;
+-- FORM 1: Edit Routine Name and Alias
+SELECT 'form' AS component, 'post' as method, 4 as width;
+SELECT 'hidden' AS type, 'action' AS name, 'update_details' AS value;
+SELECT 'hidden' AS type, 'template_id' AS name, $template_id AS value;
+SELECT 'text' AS type, 'new_template_name' AS name, 'Routine Name' AS label, $template_name AS value;
+SELECT 'text' AS type, 'user_template_alias' AS name, 'Alias (Optional)' AS label;
 
-SELECT
-    'text' as component,
-    'Assign a progression model to each exercise in this routine.' as description;
 
--- Step 6: Fetch all exercises for this routine to render them dynamically.
-SET
-    exercises_in_routine=(
-        SELECT
-            JSON_GROUP_ARRAY(
-                JSON_OBJECT(
-                    'exerciseName',
-                    ex.exerciseName,
-                    'exercisePlanId',
-                    plan.exercisePlanId,
-                    'progressionModelId',
-                    plan.progressionModelId,
-                    'progressionModelName',
-                    COALESCE(pm.modelName, 'None Assigned')
-                )
+
+-- Display Exercises in the Routine
+
+-- Fetch all exercises for this routine into a JSON object for easier handling
+SET exercises_in_routine = (
+    SELECT
+        JSON_GROUP_ARRAY(
+            JSON_OBJECT(
+                'exerciseName', ex.exerciseName,
+                'exercisePlanId', plan.exercisePlanId,
+                'progressionModelId', plan.progressionModelId
             )
-        FROM
-            dimExercisePlan AS plan
-            JOIN dimExercise AS ex ON plan.exerciseId=ex.exerciseId
-            LEFT JOIN dimProgressionModel AS pm ON plan.progressionModelId=pm.progressionModelId
-        WHERE
-            plan.userId=$current_user_id
-            AND plan.templateName=$template_name
-    );
+        )
+    FROM dimExercisePlan AS plan
+    JOIN dimExercise AS ex ON plan.exerciseId = ex.exerciseId
+    WHERE plan.userId = $current_user_id AND plan.templateId = $template_id
+);
 
--- Step 7: Use a dynamic component to render a form for each exercise.
-SELECT
-    'dynamic' as component,
-    'views/edit_workout_item.sql' as item_component,
-    $exercises_in_routine as properties;
+-- Fetch all available progression models for the user
+SET available_models = (
+    SELECT JSON_GROUP_ARRAY(JSON_OBJECT('label', modelName, 'value', progressionModelId))
+    FROM dimProgressionModel
+    WHERE userId = $current_user_id
+);
 
--- Step 8: Display a form to add a new exercise to the routine.
-SELECT
-    'divider' as component;
+SET all_exercises = (
+    SELECT JSON_GROUP_ARRAY(JSON_OBJECT('label', exerciseName, 'value', exerciseId))
+    FROM dimExercise
+    ORDER BY exerciseName
+);
+SET all_models = (
+    SELECT JSON_GROUP_ARRAY(JSON_OBJECT('label', modelName, 'value', progressionModelId))
+    FROM dimProgressionModel
+    WHERE userId = $current_user_id
+    ORDER BY modelName
+);
 
-SELECT
-    'form' as component,
-    'Add Exercise to Routine' as title,
-    'post' as method;
 
+-- Step 3: Use a CTE and UNION ALL to generate all the form fields
+WITH exercise_data AS (
+    SELECT
+        CAST(key AS INTEGER) AS idx,
+        value
+    FROM
+        json_each($exercises_in_routine)
+)
+-- For each exercise, create a header
 SELECT
-    'hidden' as type,
-    'template_name' as name,
-    $template_name as value;
+    idx AS sort_order,
+    'header' AS type,
+    'Exercise ' || (idx + 1) AS label,
+    '' AS name,
+    '' AS value,
+    '' AS options
+FROM
+    exercise_data
 
-SELECT
-    'hidden' as type,
-    'action' as name,
-    'add_exercise' as value;
+UNION ALL
 
+-- For each exercise, create a dropdown to select the exercise itself
 SELECT
-    'select' as type,
-    'exercise_id' as name,
-    'Select an Exercise' as label,
-    'Choose an exercise to add' as placeholder,
-    TRUE as required,
-    TRUE as searchable,
-    (
-        SELECT
-            JSON_GROUP_ARRAY(
-                JSON_OBJECT('label', exerciseName, 'value', exerciseId)
-            )
-        FROM
-            dimExercise
-        ORDER BY
-            exerciseName
-    ) as options;
+    idx AS sort_order,
+    'select' AS type,
+    'Exercise' AS label,
+    'exercise_id[]' AS name, -- Submit as an array
+    json_extract(value, '$.exerciseId') AS value,
+    $all_exercises AS options
+FROM
+    exercise_data
 
+UNION ALL
+
+-- For each exercise, create a dropdown to select the progression model
 SELECT
-    'submit' as component,
-    'Add Exercise' as title;
+    idx AS sort_order,
+    'select' AS type,
+    'Progression Model' AS label,
+    'progression_model_id[]' AS name, -- Submit as an array
+    json_extract(value, '$.progressionModelId') AS value,
+    $all_models AS options
+FROM
+    exercise_data
+
+UNION ALL
+
+-- For each exercise, include a hidden field with its unique plan ID
+SELECT
+    idx AS sort_order,
+    'hidden' AS type,
+    '' AS label,
+    'plan_id[]' AS name, -- Submit as an array
+    json_extract(value, '$.exercisePlanId') AS value,
+    '' as options
+FROM
+    exercise_data
+
+ORDER BY
+    sort_order, type DESC;
+
+
+-- FORM 2: Add a new exercise to the routine
+SELECT 'divider' AS component;
+SELECT 'form' AS component, 'Add New Exercise to Routine' AS title, 'post' AS method;
+SELECT 'hidden' AS type, 'action' AS name, 'add_exercise' AS value;
+SELECT 'hidden' AS type, 'template_name' AS name, $template_name AS value;
+SELECT 'hidden' AS type, 'template_id' AS name, $template_id AS value;
+SELECT 'select' AS type, 'exercise_id' AS name, 'Exercise' AS label, 'Select an exercise' AS empty_option,
+    (SELECT JSON_GROUP_ARRAY(JSON_OBJECT('label', exerciseName, 'value', exerciseId)) FROM dimExercise ORDER BY exerciseName) AS options;

@@ -7,6 +7,41 @@
  * @param         user_id, exercise_id, date_id [url, optional] A composite key to identify the workout session to edit. If absent, the page is in "create" mode.
  * @param         action [form] The action to perform (e.g., 'save_log').
  */
+-- =============================================================================
+-- Ensure the current date exists in the dimDate table
+-- =============================================================================
+INSERT OR IGNORE INTO
+    dimDate (dateId, fullDate, dayOfWeek, monthName, year)
+VALUES
+    (
+        CAST(STRFTIME('%Y%m%d', 'now') AS INTEGER),
+        STRFTIME('%Y-%m-%d', 'now'),
+        CASE STRFTIME('%w', 'now')
+            WHEN '0' THEN 'Sunday'
+            WHEN '1' THEN 'Monday'
+            WHEN '2' THEN 'Tuesday'
+            WHEN '3' THEN 'Wednesday'
+            WHEN '4' THEN 'Thursday'
+            WHEN '5' THEN 'Friday'
+            WHEN '6' THEN 'Saturday'
+        END,
+        CASE STRFTIME('%m', 'now')
+            WHEN '01' THEN 'January'
+            WHEN '02' THEN 'February'
+            WHEN '03' THEN 'March'
+            WHEN '04' THEN 'April'
+            WHEN '05' THEN 'May'
+            WHEN '06' THEN 'June'
+            WHEN '07' THEN 'July'
+            WHEN '08' THEN 'August'
+            WHEN '09' THEN 'September'
+            WHEN '10' THEN 'October'
+            WHEN '11' THEN 'November'
+            WHEN '12' THEN 'December'
+        END,
+        CAST(STRFTIME('%Y', 'now') AS INTEGER)
+    );
+
 -- Step 1: Get current user ID.
 SET
     current_user_id=(
@@ -19,7 +54,7 @@ SET
     );
 
 -- Step 2: Handle the form submission to save the workout log.
--- This section uses a "delete and replace" strategy for robustness.
+-- This uses a "delete and replace" strategy for robustness.
 -- First, delete all existing sets for this workout session.
 DELETE FROM factWorkoutHistory
 WHERE
@@ -28,7 +63,7 @@ WHERE
     AND dateId=:date_id
     AND :action='save_log';
 
--- Then, insert the new sets from the form.
+-- Then, insert the new sets from the form, ignoring any rows where reps or weight are blank.
 INSERT INTO
     factWorkoutHistory (
         workoutHistoryId,
@@ -40,6 +75,7 @@ INSERT INTO
         repsPerformed,
         weightUsed,
         rpeRecorded,
+        notes,
         createdAt,
         updatedAt
     )
@@ -48,139 +84,53 @@ SELECT
     :user_id,
     :exercise_id,
     :date_id,
-    :exercise_plan_id,
-    1,
-    :reps_1,
-    :weight_1,
+    NULLIF(:exercise_plan_id, ''),
+    step_data.setNumber,
+    step_data.reps,
+    step_data.weight,
     :rpe_recorded,
+    :notes_recorded,
     STRFTIME('%s', 'now'),
     STRFTIME('%s', 'now')
+FROM
+    (
+        SELECT
+            1 AS setNumber,
+            :reps_1 AS reps,
+            :weight_1 AS weight
+        UNION ALL
+        SELECT
+            2,
+            :reps_2,
+            :weight_2
+        UNION ALL
+        SELECT
+            3,
+            :reps_3,
+            :weight_3
+        UNION ALL
+        SELECT
+            4,
+            :reps_4,
+            :weight_4
+        UNION ALL
+        SELECT
+            5,
+            :reps_5,
+            :weight_5
+    ) AS step_data
 WHERE
     :action='save_log'
-    AND :reps_1 IS NOT NULL;
-
-INSERT INTO
-    factWorkoutHistory (
-        workoutHistoryId,
-        userId,
-        exerciseId,
-        dateId,
-        exercisePlanId,
-        setNumber,
-        repsPerformed,
-        weightUsed,
-        rpeRecorded,
-        createdAt,
-        updatedAt
+    AND (
+        step_data.reps IS NOT NULL
+        AND step_data.reps!=''
     )
-SELECT
-    HEX(RANDOMBLOB(16)),
-    :user_id,
-    :exercise_id,
-    :date_id,
-    :exercise_plan_id,
-    2,
-    :reps_2,
-    :weight_2,
-    :rpe_recorded,
-    STRFTIME('%s', 'now'),
-    STRFTIME('%s', 'now')
-WHERE
-    :action='save_log'
-    AND :reps_2 IS NOT NULL;
-
-INSERT INTO
-    factWorkoutHistory (
-        workoutHistoryId,
-        userId,
-        exerciseId,
-        dateId,
-        exercisePlanId,
-        setNumber,
-        repsPerformed,
-        weightUsed,
-        rpeRecorded,
-        createdAt,
-        updatedAt
-    )
-SELECT
-    HEX(RANDOMBLOB(16)),
-    :user_id,
-    :exercise_id,
-    :date_id,
-    :exercise_plan_id,
-    3,
-    :reps_3,
-    :weight_3,
-    :rpe_recorded,
-    STRFTIME('%s', 'now'),
-    STRFTIME('%s', 'now')
-WHERE
-    :action='save_log'
-    AND :reps_3 IS NOT NULL;
-
-INSERT INTO
-    factWorkoutHistory (
-        workoutHistoryId,
-        userId,
-        exerciseId,
-        dateId,
-        exercisePlanId,
-        setNumber,
-        repsPerformed,
-        weightUsed,
-        rpeRecorded,
-        createdAt,
-        updatedAt
-    )
-SELECT
-    HEX(RANDOMBLOB(16)),
-    :user_id,
-    :exercise_id,
-    :date_id,
-    :exercise_plan_id,
-    4,
-    :reps_4,
-    :weight_4,
-    :rpe_recorded,
-    STRFTIME('%s', 'now'),
-    STRFTIME('%s', 'now')
-WHERE
-    :action='save_log'
-    AND :reps_4 IS NOT NULL;
-
-INSERT INTO
-    factWorkoutHistory (
-        workoutHistoryId,
-        userId,
-        exerciseId,
-        dateId,
-        exercisePlanId,
-        setNumber,
-        repsPerformed,
-        weightUsed,
-        rpeRecorded,
-        createdAt,
-        updatedAt
-    )
-SELECT
-    HEX(RANDOMBLOB(16)),
-    :user_id,
-    :exercise_id,
-    :date_id,
-    :exercise_plan_id,
-    5,
-    :reps_5,
-    :weight_5,
-    :rpe_recorded,
-    STRFTIME('%s', 'now'),
-    STRFTIME('%s', 'now')
-WHERE
-    :action='save_log'
-    AND :reps_5 IS NOT NULL;
+    AND (
+        step_data.weight IS NOT NULL
+        AND step_data.weight!=''
+    );
 
 -- After saving the sets, handle the progression logic.
--- If the RPE was 8 or lower, increment the current step number for this exercise plan.
 UPDATE dimExercisePlan
 SET
     currentStepNumber=currentStepNumber+1
@@ -197,6 +147,56 @@ WHERE
     :action='save_log';
 
 -- =============================================================================
+-- Handle the delete request
+-- =============================================================================
+-- Step 2a: Before deleting, check if this workout caused a progression and revert it.
+-- This block runs only if the submitted action is 'delete_log'.
+UPDATE dimExercisePlan
+SET
+    currentStepNumber=currentStepNumber - 1
+WHERE
+    -- Find the correct plan using the exercisePlanId from the workout we are about to delete
+    exercisePlanId=(
+        SELECT
+            fwh.exercisePlanId
+        FROM
+            factWorkoutHistory AS fwh
+        WHERE
+            fwh.userId=:user_id
+            AND fwh.exerciseId=:exercise_id
+            AND fwh.dateId=:date_id
+        LIMIT
+            1
+    )
+    -- Only revert progression if the recorded RPE was 8 or less
+    AND (
+        SELECT
+            MAX(fwh.rpeRecorded)
+        FROM
+            factWorkoutHistory AS fwh
+        WHERE
+            fwh.userId=:user_id
+            AND fwh.exerciseId=:exercise_id
+            AND fwh.dateId=:date_id
+    )<=8
+    AND :action='delete_log';
+
+-- Step 2b: Delete all sets for this workout session.
+DELETE FROM factWorkoutHistory
+WHERE
+    userId=:user_id
+    AND exerciseId=:exercise_id
+    AND dateId=:date_id
+    AND :action='delete_log';
+
+-- Step 2c: After deleting, redirect back to the Training Log page.
+SELECT
+    'redirect' as component,
+    '/views/view_history.sql?deleted=true' as link
+WHERE
+    :action='delete_log';
+
+-- =============================================================================
 -- Page Rendering Logic (only runs on GET requests)
 -- =============================================================================
 -- Step 3: Load the main layout.
@@ -211,10 +211,12 @@ SET
             JSON_OBJECT(
                 'exerciseName',
                 ex.exerciseName,
+                'fullDate',
+                d.fullDate,
                 'exercisePlanId',
                 fwh.exercisePlanId,
                 'rpe',
-                MAX(fwh.rpeRecorded), -- Get a single RPE value for the session
+                MAX(fwh.rpeRecorded),
                 'sets',
                 JSON_GROUP_ARRAY(
                     JSON_OBJECT(
@@ -230,6 +232,7 @@ SET
         FROM
             factWorkoutHistory AS fwh
             JOIN dimExercise AS ex ON fwh.exerciseId=ex.exerciseId
+            JOIN dimDate AS d ON fwh.dateId=d.dateId
         WHERE
             fwh.userId=$user_id
             AND fwh.exerciseId=$exercise_id
@@ -249,9 +252,9 @@ SELECT
 
 SELECT
     'text' as component,
-    CASE
-        WHEN $user_id IS NOT NULL THEN JSON_EXTRACT($workout_session_data, '$.exerciseName')
-    END as description;
+    JSON_EXTRACT($workout_session_data, '$.fullDate')||' | '||JSON_EXTRACT($workout_session_data, '$.exerciseName') as contents_md
+WHERE
+    $user_id IS NOT NULL;
 
 -- Step 6: Display the main form.
 SELECT
@@ -263,7 +266,6 @@ SELECT
     'action' as name,
     'save_log' as value;
 
--- Pass all parts of the composite key to the action.
 SELECT
     'hidden' as type,
     'user_id' as name,
@@ -272,7 +274,9 @@ SELECT
 SELECT
     'hidden' as type,
     'exercise_id' as name,
-    COALESCE($exercise_id, :exercise_id_new) as value;
+    $exercise_id as value
+WHERE
+    $user_id IS NOT NULL;
 
 SELECT
     'hidden' as type,
@@ -287,7 +291,7 @@ SELECT
 -- If in "Create" mode, show a dropdown to select the exercise.
 SELECT
     'select' as type,
-    'exercise_id_new' as name,
+    'exercise_id' as name, -- The name is now 'exercise_id'
     'Select Exercise' as label,
     TRUE as required,
     (
@@ -321,6 +325,7 @@ SELECT
     'Set'||set_number as label,
     '' as prefix,
     '' as value,
+    '' as step,
     3 as width
 FROM
     series
@@ -330,11 +335,12 @@ SELECT
     'number' as type,
     'reps_'||set_number as name,
     '' as label,
-    'Reps' as prefix, 
+    'Reps' as prefix,
     JSON_EXTRACT(
         $workout_session_data,
         '$.sets['||(set_number - 1)||'].reps'
     ) as value,
+    0.01 as step,
     3 as width
 FROM
     series
@@ -349,6 +355,7 @@ SELECT
         $workout_session_data,
         '$.sets['||(set_number - 1)||'].weight'
     ) as value,
+    0.01 as step,
     3 as width
 FROM
     series
@@ -359,22 +366,83 @@ ORDER BY
 SELECT
     'header' as type,
     '' as name,
-    'RPE (Rate of Perceived Exertion)' as label,
-    '' as value,
     '' as prefix,
+    'RPE ' as label,
+    '' as value,
+    '' as step,
     0 as max,
-    6 as width
+    3 as width
 UNION ALL
 SELECT
     'number' as type,
     'rpe_recorded' as name,
-    '' as label,
     'RPE' as prefix,
+    '' as label,
     JSON_EXTRACT($workout_session_data, '$.rpe') as value,
+    0.01 as step,
     10 as max,
-    6 as width;
+    3 as width
+    -- Notes
+UNION ALL
+SELECT
+    'header' as type,
+    '' as name,
+    '' as prefix,
+    'Notes' as label,
+    '' as value,
+    '' as step,
+    0 as max,
+    3 as width
+UNION ALL
+SELECT
+    'textarea' as type,
+    'notes_recorded' as name,
+    '' as prefix,
+    '' as label,
+    JSON_EXTRACT($workout_session_data, '$.notes') as value,
+    '' as step,
+    0 as max,
+    5 as width;
 
 SELECT
     'button' as component,
     'submit' as type,
     'Save Workout' as title;
+
+-- =============================================================================
+-- Display the Delete button (only in "Edit" mode)
+-- =============================================================================
+SELECT
+    'divider' as component
+WHERE
+    $user_id IS NOT NULL;
+
+SELECT
+    'form' as component,
+    'post' as method,
+    -- 'delete_log_form' as id,
+    'Delete Log' as validate,
+    'red' as validate_color
+WHERE
+    $user_id IS NOT NULL;
+
+-- Hidden fields to pass the necessary data for the delete action
+SELECT
+    'hidden' as type,
+    'action' as name,
+    'delete_log' as value;
+
+SELECT
+    'hidden' as type,
+    'user_id' as name,
+    $user_id as value;
+
+SELECT
+    'hidden' as type,
+    'exercise_id' as name,
+    $exercise_id as value;
+
+SELECT
+    'hidden' as type,
+    'date_id' as name,
+    $date_id as value;

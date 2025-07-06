@@ -1,7 +1,7 @@
 table_name: factWorkoutHistory
 description: "The central fact table. Each row represents one set performed by a user. This is the ultimate source of truth for all calculations."
 created_at: "2025-06-02"
-updated_at: "2025-06-02"
+updated_at: "2025-06-06"
 owner: "David Rusho"
 tags:
   - fact
@@ -25,6 +25,10 @@ columns:
 
   - name: exercisePlanId
     description: "Foreign Key referencing the active exercise plan at the time of the workout."
+  
+  - name: notes
+    description: "User-provided notes for the workout session."
+    tests: []
 
   - name: repsPerformed
     description: "The number of repetitions performed in the set."

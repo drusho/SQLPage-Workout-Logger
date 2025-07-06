@@ -53,10 +53,13 @@ SELECT
     d.fullDate AS "Date",
     e.exerciseName AS "Exercise",
     -- Aggregate all sets for the workout into a single summary string
-    GROUP_CONCAT(
-        'Set '||fwh.setNumber||': '||fwh.repsPerformed||'x'||fwh.weightUsed||' @'||fwh.rpeRecorded,
-        ' | '
+    CONCAT (
+        GROUP_CONCAT(
+            ' '||fwh.setNumber||'x'||fwh.repsPerformed||'@'||fwh.weightUsed
+        ),
+        ' rpe:'||fwh.rpeRecorded
     ) AS "Sets",
+    fwh.notes AS "Notes",
     -- Generate the Edit link for each workout session
     FORMAT(
         '[Edit](/actions/action_edit_history.sql?user_id=%s&exercise_id=%s&date_id=%s)',
