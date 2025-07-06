@@ -1,55 +1,60 @@
 /**
  * @filename      view_history.sql
- * @description   Displays a high-level summary of workout logs, grouping all sets for a given exercise and day into a single line.
+ * @description   Displays a personal, aggregated summary of the logged-in user's past workouts.
  * @created       2025-06-18
- * @last-updated  2025-07-03
- * @requires      - `layouts/layout_main.sql` for the page shell and authentication.
- * @requires      - `factWorkoutHistory`, `dimDate`, `dimExercise`, `dimUser` tables.
- * @returns       A full UI page containing a searchable and sortable table of the aggregated workout history.
+ * @last-updated  2025-07-05
+ * @requires      - `layouts/layout_main.sql` for the page shell and session variables.
+ * @requires      - `factWorkoutHistory`, `dimDate`, `dimExercise` tables.
+ * @returns       A UI page containing a searchable table of the user's workout history.
  * @see           - /actions/action_edit_history.sql: The page for editing a workout log.
  */
-------------------------------------------------------
--- STEP 1: RENDER PAGE STRUCTURE
-------------------------------------------------------
+-- Step 1: Load the main layout and get the current user's ID.
 SELECT
     'dynamic' AS component,
     sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
 
-------------------------------------------------------
--- STEP 2: RENDER PAGE HEADER AND ACTIONS
-------------------------------------------------------
-SELECT
-    'text' AS component,
-    'Workout History' AS title;
+SET
+    current_user_id=(
+        SELECT
+            username
+        FROM
+            sessions
+        WHERE
+            session_token=sqlpage.cookie ('session_token')
+    );
 
--- The "Add Workout Log" button should link to the edit page without an ID to enter "create" mode.
+-- Step 2: Display the page header and "Add" button.
 SELECT
-    'button' AS component,
-    'md' AS size;
+    'text' as component,
+    'Training Log' as title;
 
 SELECT
-    '/actions/action_edit_history.sql' AS link,
-    'azure' AS outline,
-    'Add Workout Log' AS title,
-    'plus' AS icon;
+    'button' as component,
+    'md' as size;
 
-------------------------------------------------------
--- STEP 3: RENDER THE WORKOUT HISTORY LIST
-------------------------------------------------------
 SELECT
-    'table' AS component,
-    'All Workouts' AS title,
-    TRUE AS sort,
-    TRUE AS small,
-    'Action' AS markdown;
+    '/actions/action_edit_history.sql' as link,
+    'azure' as outline,
+    'Add Workout Log' as title,
+    'plus' as icon;
+
+-- Step 3: Display the workout history table for the current user.
+SELECT
+    'divider' as component;
+
+SELECT
+    'table' as component,
+    'Your Past Workouts' as title,
+    TRUE as sort,
+    TRUE as small,
+    'Action' as markdown;
 
 SELECT
     d.fullDate AS "Date",
-    u.displayName AS "User",
     e.exerciseName AS "Exercise",
     -- Aggregate all sets for the workout into a single summary string
     GROUP_CONCAT(
-        'Set ' || fwh.setNumber || ': ' || fwh.repsPerformed || 'x' || fwh.weightUsed || ' @' || fwh.rpeRecorded,
+        'Set '||fwh.setNumber||': '||fwh.repsPerformed||'x'||fwh.weightUsed||' @'||fwh.rpeRecorded,
         ' | '
     ) AS "Sets",
     -- Generate the Edit link for each workout session
@@ -61,12 +66,13 @@ SELECT
     ) AS "Action"
 FROM
     factWorkoutHistory AS fwh
-    JOIN dimDate AS d ON fwh.dateId = d.dateId
-    JOIN dimExercise AS e ON fwh.exerciseId = e.exerciseId
-    JOIN dimUser AS u ON fwh.userId = u.userId
+    JOIN dimDate AS d ON fwh.dateId=d.dateId
+    JOIN dimExercise AS e ON fwh.exerciseId=e.exerciseId
+WHERE
+    -- Only show workouts for the currently logged-in user.
+    fwh.userId=$current_user_id
 GROUP BY
     d.fullDate,
-    u.displayName,
     e.exerciseName,
     fwh.userId,
     fwh.exerciseId,
