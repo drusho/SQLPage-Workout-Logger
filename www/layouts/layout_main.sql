@@ -41,6 +41,7 @@ SELECT
     '/' AS link,
     'en-US' as lang,
     'auto' as theme,
+    '/js/workout_logger.js' as javascript,
     '/assets/custom_form_layout.css' as css,
     -- Use a CASE statement to select the correct menu and personalize it.
     CASE

@@ -1,15 +1,14 @@
 /**
  * @filename      index.sql
- * @description   The main dashboard for logging workouts. Guides the user through selecting a
- * routine and an exercise, then displays their targets and a form to log their performance.
- * @created       2025-06-14
- * @last-updated  2025-07-05
- * @requires      - `layouts/layout_main.sql` for the page shell.
- * @requires      - All `dim` and `fact` tables to drive the workout logging process.
- * @param         template_name [url, optional] The name of the routine to log.
- * @param         exercise_id [url, optional] The ID of the exercise to log.
+ * @description   The main dashboard for logging workouts. Guides the user through selecting a routine and exercise,
+ * then displays their targets and a form to log their performance.
+ * @created       2025-07-07
+ * @requires      - layouts/layout_main.sql, All dim tables, action_edit_history.sql
  */
--- Step 1: Load the main layout and get the current user's ID.
+-- =============================================================================
+-- Step 1: Initial Setup
+-- =============================================================================
+-- Load the main layout and get the current user's ID
 SELECT
     'dynamic' AS component,
     sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
@@ -24,176 +23,176 @@ SET
             session_token=sqlpage.cookie ('session_token')
     );
 
--- Step 2: Display a success alert if a workout was just saved.
-SELECT
-    'alert' as component,
-    'Success!' as title,
-    'Your workout has been saved.' as description,
-    'check' as icon,
-    'green' as color,
-    5 as close_after
-WHERE
-    $saved='true';
+-- Get the selected routine and exercise from the URL parameters
+SET
+    template_id=$template_id;
 
--- Step 3: Display the Routine Selector form.
+SET
+    exercise_plan_id=$exercise_plan_id;
+
+-- Display the main page title
 SELECT
-    'form' as component,
+    'text' AS component,
+    'Log a Workout' AS title;
+
+-- =============================================================================
+-- Step 2: Routine Selection Form
+-- This form is always visible.
+-- =============================================================================
+SELECT
+    'form' AS component,
+    'get' AS method,
     'index.sql' as action,
-    'true' as auto_submit;
+    TRUE as auto_submit;
 
 SELECT
-    'select' as type,
-    'template_name' as name,
-    'Select a Routine' as label,
-    'Choose a routine to start...' as placeholder,
-    :template_name as value,
-    -- UPDATED: Replaced the faulty MAX() query with a more robust CTE to get unique routine names.
+    'select' AS type,
+    'template_id' AS name,
+    'Step 1: Select Your Routine' AS label,
+    'Select a Routine' AS empty_option,
+    $template_id AS value,
     (
-        WITH
-            RankedNames AS (
-                SELECT
+        SELECT
+            JSON_GROUP_ARRAY(
+                JSON_OBJECT('label', templateName, 'value', templateId)
+            )
+        FROM
+            (
+                SELECT DISTINCT
                     templateName,
-                    COALESCE(userTemplateAlias, templateName) as displayName,
-                    -- This ranks rows, giving priority to ones with a custom alias.
-                    ROW_NUMBER() OVER (
-                        PARTITION BY
-                            templateName
-                        ORDER BY
-                            userTemplateAlias DESC
-                    ) as rn
+                    templateId
                 FROM
                     dimExercisePlan
                 WHERE
                     userId=$current_user_id
                     AND isActive=1
             )
-        SELECT
-            JSON_GROUP_ARRAY(
-                JSON_OBJECT('label', displayName, 'value', templateName)
-            )
-        FROM
-            RankedNames
-        WHERE
-            rn=1
         ORDER BY
             templateName
-    ) as options;
+    ) AS options;
 
 -- =============================================================================
--- This section only renders if a routine has been selected.
+-- Step 3: Exercise Selection Form
+-- This form appears only after a routine has been selected.
 -- =============================================================================
--- Step 4: Display the Exercise Selector form.
 SELECT
-    'form' as component,
+    'form' AS component,
+    'get' AS method,
     'index.sql' as action,
-    'true' as auto_submit
+    TRUE as auto_submit
 WHERE
-    $template_name IS NOT NULL;
+    $template_id IS NOT NULL;
 
+-- Pass the selected template_id through so we don't lose it on the next reload
 SELECT
     'hidden' as type,
-    'template_name' as name,
-    $template_name as value;
+    'template_id' as name,
+    $template_id as value;
 
 SELECT
-    'select' as type,
-    'exercise_id' as name,
-    'Select an Exercise' as label,
-    'Choose an exercise to log...' as placeholder,
-    :exercise_id as value,
+    'select' AS type,
+    'exercise_plan_id' AS name,
+    'Step 2: Select Your Exercise' AS label,
+    'Select an Exercise' AS empty_option,
+    $exercise_plan_id AS value,
     (
         SELECT
             JSON_GROUP_ARRAY(
                 JSON_OBJECT(
                     'label',
-                    COALESCE(duep.userExerciseAlias, de.exerciseName),
+                    ex.exerciseName,
                     'value',
-                    de.exerciseId
+                    plan.exercisePlanId
                 )
             )
         FROM
-            dimExercisePlan AS dep
-            JOIN dimExercise AS de ON dep.exerciseId=de.exerciseId
-            LEFT JOIN dimUserExercisePreferences AS duep ON dep.exerciseId=duep.exerciseId
-            AND dep.userId=$current_user_id
+            dimExercisePlan AS plan
+            JOIN dimExercise AS ex ON plan.exerciseId=ex.exerciseId
         WHERE
-            dep.userId=$current_user_id
-            AND dep.templateName=$template_name
-    ) as options;
+            plan.templateId=$template_id
+            AND plan.userId=$current_user_id
+        ORDER BY
+            ex.exerciseName
+    ) AS options;
 
 -- =============================================================================
--- This section only renders if an exercise has been selected.
+-- Step 4: Workout Logging Form
+-- This section appears only after both a routine and an exercise have been selected.
 -- =============================================================================
--- Step 5: Fetch all necessary data for the selected exercise plan and its progression.
 SET
-    plan_data=(
+    current_exercise_data=(
         SELECT
             JSON_OBJECT(
-                'exercisePlanId',
-                plan.exercisePlanId,
-                'currentStepNumber',
-                plan.currentStepNumber,
-                'current1rmEstimate',
-                plan.current1rmEstimate,
-                'progressionModelId',
-                plan.progressionModelId,
+                'exerciseName',
+                ex.exerciseName,
+                'exerciseId',
+                plan.exerciseId,
                 'targetSets',
-                step.targetSets,
+                COALESCE(step.targetSets, 3),
                 'targetReps',
-                step.targetReps,
-                'percentOfMax',
-                step.percentOfMax
+                COALESCE(step.targetReps, 5),
+                'targetWeight',
+                ROUND(
+                    plan.current1rmEstimate*(step.percentOfMax/100),
+                    1
+                )
             )
         FROM
             dimExercisePlan AS plan
-            JOIN dimProgressionModelStep AS step ON plan.progressionModelId=step.progressionModelId
+            JOIN dimExercise AS ex ON plan.exerciseId=ex.exerciseId
+            LEFT JOIN dimProgressionModelStep AS step ON plan.progressionModelId=step.progressionModelId
             AND plan.currentStepNumber=step.stepNumber
         WHERE
-            plan.userId=$current_user_id
-            AND plan.exerciseId=$exercise_id
+            plan.exercisePlanId=$exercise_plan_id
     );
 
--- Step 6: Display the user's target for today's workout.
+-- Display the targets for the selected exercise
 SELECT
-    'alert' as component,
-    'Target for Today' as title,
-    FORMAT(
-        'Your goal is **%s sets** of **%s reps** at **%s lbs**.',
-        JSON_EXTRACT($plan_data, '$.targetSets'),
-        JSON_EXTRACT($plan_data, '$.targetReps'),
-        CAST(
-            JSON_EXTRACT($plan_data, '$.current1rmEstimate')*JSON_EXTRACT($plan_data, '$.percentOfMax') AS INTEGER
-        )
-    ) as description,
-    'info' as color,
-    'target' as icon
+    'foldable' AS component
 WHERE
-    $exercise_id IS NOT NULL
-    AND $plan_data IS NOT NULL;
+    $exercise_plan_id IS NOT NULL;
 
--- Step 7: Display the main form for logging the workout.
 SELECT
-    'form' as component,
-    '/actions/action_save_workout.sql' as action,
-    'Log Workout' as validate,
-    'green' as validate_color,
-    'post' as method
+    'Exercise Targets' as title,
+    JSON_EXTRACT($current_exercise_data, '$.targetSets')||'x'||JSON_EXTRACT($current_exercise_data, '$.targetReps') as description_md
 WHERE
-    $exercise_id IS NOT NULL
-    AND $plan_data IS NOT NULL;
+    $exercise_plan_id IS NOT NULL;
 
--- Pass all necessary IDs and data to the action script as hidden fields.
+-- Display the final form to log performance
 SELECT
-    'hidden' as type,
-    'exercise_plan_id' as name,
-    JSON_EXTRACT($plan_data, '$.exercisePlanId') as value;
+    'form' AS component,
+    'post' AS method,
+    'action_edit_history.sql' AS action
+WHERE
+    $exercise_plan_id IS NOT NULL;
+
+-- Hidden fields to pass all necessary data to the action page
+SELECT
+    'hidden' AS type,
+    'action' AS name,
+    'save_log' AS value;
 
 SELECT
-    'hidden' as type,
-    'num_sets' as name,
-    JSON_EXTRACT($plan_data, '$.targetSets') as value;
+    'hidden' AS type,
+    'exercise_plan_id' AS name,
+    $exercise_plan_id AS value;
 
--- Dynamically generate the input fields for each set.
+SELECT
+    'hidden' AS type,
+    'exercise_id' AS name,
+    JSON_EXTRACT($current_exercise_data, '$.exerciseId') AS value;
+
+SELECT
+    'hidden' AS type,
+    'date_id' AS name,
+    STRFTIME('%Y%m%d', 'now') AS value;
+
+SELECT
+    'hidden' AS type,
+    'user_id' AS name,
+    $current_user_id AS value;
+
+-- Generate input fields for 5 sets
 WITH RECURSIVE
     series (set_number) AS (
         SELECT
@@ -204,41 +203,43 @@ WITH RECURSIVE
         FROM
             series
         WHERE
-            set_number<CAST(
-                JSON_EXTRACT($plan_data, '$.targetSets') AS INTEGER
-            )
+            set_number<5
     )
+    -- Header for each set
 SELECT
     set_number,
-    'number' as type,
-    'reps_'||set_number as name,
-    'Set '||set_number||' Reps' as label,
-    3 as width
+    'header' AS type,
+    'Set '||set_number AS label,
+    NULL AS name,
+    NULL AS prefix,
+    6 AS width,
+    NULL AS step
 FROM
     series
 UNION ALL
+-- 'Reps' input for each set
 SELECT
     set_number,
-    'number' as type,
-    'weight_'||set_number as name,
-    'Weight (lbs)' as label,
-    3 as width
+    'number' AS type,
+    '' AS label,
+    'reps_'||set_number AS name,
+    'Reps' AS prefix,
+    3 AS width,
+    1 AS step -- Allow whole number increments for reps
+FROM
+    series
+UNION ALL
+-- 'Weight' input for each set
+SELECT
+    set_number,
+    'number' AS type,
+    '' AS label,
+    'weight_'||set_number AS name,
+    'Wt' AS prefix,
+    3 AS width,
+    0.01 AS step -- Allow fractional increments for weight
 FROM
     series
 ORDER BY
-    set_number;
-
--- Add fields for RPE and notes.
-SELECT
-    'number' as type,
-    'rpe_recorded' as name,
-    'RPE (Overall)' as label,
-    8 as value,
-    10 as max,
-    6 as width;
-
-SELECT
-    'textarea' as type,
-    'notes_recorded' as name,
-    'Workout Notes' as label,
-    6 as width;
+    set_number,
+    type;
