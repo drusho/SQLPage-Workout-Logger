@@ -34,7 +34,7 @@ SELECT
 
 SELECT
     '/actions/action_edit_history.sql' as link,
-    'azure' as outline,
+    'green' as color,
     'Add Workout Log' as title,
     'plus' as icon;
 

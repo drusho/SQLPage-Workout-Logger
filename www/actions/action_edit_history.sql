@@ -14,18 +14,18 @@ INSERT OR IGNORE INTO
     dimDate (dateId, fullDate, dayOfWeek, monthName, year)
 VALUES
     (
-        CAST(STRFTIME('%Y%m%d', 'now') AS INTEGER),
-        STRFTIME('%Y-%m-%d', 'now'),
-        CASE STRFTIME('%w', 'now')
+        CAST(STRFTIME('%Y%m%d', 'now', 'localtime') AS INTEGER),
+        STRFTIME('%Y-%m-%d', 'now', 'localtime'),
+        CASE STRFTIME('%w', 'now', 'localtime')
             WHEN '0' THEN 'Sunday'
             WHEN '1' THEN 'Monday'
             WHEN '2' THEN 'Tuesday'
             WHEN '3' THEN 'Wednesday'
             WHEN '4' THEN 'Thursday'
             WHEN '5' THEN 'Friday'
-            WHEN '6' THEN 'Saturday'
+            ELSE 'Saturday'
         END,
-        CASE STRFTIME('%m', 'now')
+        CASE STRFTIME('%m', 'now', 'localtime')
             WHEN '01' THEN 'January'
             WHEN '02' THEN 'February'
             WHEN '03' THEN 'March'
@@ -37,9 +37,9 @@ VALUES
             WHEN '09' THEN 'September'
             WHEN '10' THEN 'October'
             WHEN '11' THEN 'November'
-            WHEN '12' THEN 'December'
+            ELSE 'December'
         END,
-        CAST(STRFTIME('%Y', 'now') AS INTEGER)
+        CAST(STRFTIME('%Y', 'now', 'localtime') AS INTEGER)
     );
 
 -- Step 1: Get current user ID.
@@ -52,6 +52,65 @@ SET
         WHERE
             session_token=sqlpage.cookie ('session_token')
     );
+
+-- Step 1c: Update the 1RM estimate based on the performance of the first set
+-- This uses the Epley formula to calculate a new estimated 1-Rep-Max.
+UPDATE dimExercisePlan
+SET
+    current1rmEstimate=:weight_1*(1+(:reps_1/30.0))
+WHERE
+    exercisePlanId=:exercise_plan_id
+    AND :action='save_log'
+    -- Only run the calculation if the RPE is 8 or lower
+    AND CAST(:rpe_recorded AS REAL)<=8
+    -- And ensure data for set 1 was actually submitted
+    AND :reps_1 IS NOT NULL
+    AND :reps_1!=''
+    AND :weight_1 IS NOT NULL
+    AND :weight_1!='';
+
+-- Step 1d: Update Max Reps Estimate for Rep-Based Models
+UPDATE dimExercisePlan
+SET
+    currentMaxRepsEstimate=(
+        -- Use the simpler MAX() function, treating any empty values as 0
+        SELECT
+            MAX(
+                COALESCE(:reps_1, 0),
+                COALESCE(:reps_2, 0),
+                COALESCE(:reps_3, 0),
+                COALESCE(:reps_4, 0),
+                COALESCE(:reps_5, 0)
+            )
+    )
+WHERE
+    exercisePlanId=:exercise_plan_id
+    AND :action='save_log'
+    AND (
+        :rpe_recorded IS NULL
+        OR :rpe_recorded=''
+        OR CAST(:rpe_recorded AS REAL)<=8
+    )
+    -- Only update if this is a rep-based progression model
+    AND (
+        SELECT
+            modelType
+        FROM
+            dimProgressionModel
+        WHERE
+            progressionModelId=dimExercisePlan.progressionModelId
+    )='reps'
+    -- And only if the new rep max is greater than the old one
+    AND (
+        SELECT
+            MAX(
+                COALESCE(:reps_1, 0),
+                COALESCE(:reps_2, 0),
+                COALESCE(:reps_3, 0),
+                COALESCE(:reps_4, 0),
+                COALESCE(:reps_5, 0)
+            )
+    )>COALESCE(currentMaxRepsEstimate, 0);
 
 -- Step 2: Handle the form submission to save the workout log.
 -- This uses a "delete and replace" strategy for robustness.
@@ -133,18 +192,38 @@ WHERE
 -- After saving the sets, handle the progression logic.
 UPDATE dimExercisePlan
 SET
-    currentStepNumber=currentStepNumber+1
+    -- Use a CASE statement to decide whether to increment the step or restart the cycle
+    currentStepNumber=CASE
+    -- If the current step is the last step in the model, reset to 1
+        WHEN currentStepNumber=(
+            SELECT
+                MAX(stepNumber)
+            FROM
+                dimProgressionModelStep
+            WHERE
+                progressionModelId=dimExercisePlan.progressionModelId
+        ) THEN 1
+        -- Otherwise, just increment the step number by 1
+        ELSE currentStepNumber+1
+    END,
+    -- Also update the 1RM estimate if the cycle is being restarted
+    current1rmEstimate=CASE
+    -- If the current step is the last step, add 5 lbs to the 1RM estimate
+        WHEN currentStepNumber=(
+            SELECT
+                MAX(stepNumber)
+            FROM
+                dimProgressionModelStep
+            WHERE
+                progressionModelId=dimExercisePlan.progressionModelId
+        ) THEN current1rmEstimate+5
+        -- Otherwise, keep the 1RM estimate the same
+        ELSE current1rmEstimate
+    END
 WHERE
     exercisePlanId=:exercise_plan_id
-    AND :rpe_recorded<=8
-    AND :action='save_log';
-
--- After all actions, redirect back to the Training Log page.
-SELECT
-    'redirect' as component,
-    '/views/view_history.sql?saved=true' as link
-WHERE
-    :action='save_log';
+    AND :action='save_log'
+    AND :rpe_recorded<=8;
 
 -- =============================================================================
 -- Handle the delete request
@@ -196,6 +275,13 @@ SELECT
 WHERE
     :action='delete_log';
 
+-- SELECT
+--     'redirect' AS component,
+--     -- Rebuild the URL to remember both the selected routine and exercise
+--     '/index.sql?template_id='||:template_id||'&exercise_plan_id='||:exercise_plan_id AS link
+-- WHERE
+--     :action='manual_progression_update'
+--     OR :action='save_log';
 -- =============================================================================
 -- Page Rendering Logic (only runs on GET requests)
 -- =============================================================================
@@ -291,17 +377,21 @@ SELECT
 -- If in "Create" mode, show a dropdown to select the exercise.
 SELECT
     'select' as type,
-    'exercise_id' as name, -- The name is now 'exercise_id'
+    'exercise_id' as name,
     'Select Exercise' as label,
     TRUE as required,
     (
+        -- This subquery now manually builds a sorted JSON array
         SELECT
-            JSON_GROUP_ARRAY(
-                JSON_OBJECT('label', exerciseName, 'value', exerciseId)
-            )
+            '['||GROUP_CONCAT(
+                '{"label":"'||REPLACE(exerciseName, '"', '\"')||'","value":"'||exerciseId||'"}'
+                ORDER BY
+                    exerciseName
+            )||']'
         FROM
             dimExercise
-    ) as options
+    ) as options,
+    'Select an Exercise' as empty_option
 WHERE
     $user_id IS NULL;
 
