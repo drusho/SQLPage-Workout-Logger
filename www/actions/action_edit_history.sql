@@ -1,15 +1,36 @@
 /**
  * @filename      action_edit_history.sql
- * @description   A self-submitting page for creating a new workout log or editing an existing one.
- * @created       2025-07-05
+ * @description   A self-submitting page for creating a new workout log or editing an existing one. It handles
+ * workout data submission from the main logging page, updates user progression, and processes deletions.
+ * When loaded directly (GET), it renders a form for manual editing or creation of a log entry.
+ * @created       2025-07-09
  * @requires      - `layouts/layout_main.sql` for the page shell.
- * @requires      - All `dim` and `fact` tables.
- * @param         user_id, exercise_id, date_id [url, optional] A composite key to identify the workout session to edit. If absent, the page is in "create" mode.
- * @param         action [form] The action to perform (e.g., 'save_log').
+ * - All `dim` and `fact` tables.
+ * @param         user_id [url, optional] Part of the composite key to identify a workout session to edit.
+ * @param         exercise_id [url, optional] Part of the composite key to identify a workout session to edit.
+ * @param         date_id [url, optional] Part of the composite key to identify a workout session to edit. If absent, the page is in "create" mode.
+ * @param         action [form] The server-side action to perform (e.g., 'save_log', 'delete_log').
+ * @param         reps_1, weight_1, etc. [form] The performance data for each set.
+ * @param         rpe_recorded [form] The user's Rate of Perceived Exertion for the workout.
+ * @param         notes_recorded [form] Any notes for the workout session.
+ * @param         original_date_id [form] The original date of the record being edited, to handle date changes correctly.
  */
 -- =============================================================================
--- Ensure the current date exists in the dimDate table
+-- Step 1: Initial Setup
 -- =============================================================================
+-- Step 1a: Get Current User
+SET
+    current_user_id=(
+        SELECT
+            username
+        FROM
+            sessions
+        WHERE
+            session_token=sqlpage.cookie ('session_token')
+    );
+
+-- Step 1b: Ensure Date Dimension Exists
+-- Ensures that an entry for the current local date is in the dimDate table before proceeding.
 INSERT OR IGNORE INTO
     dimDate (dateId, fullDate, dayOfWeek, monthName, year)
 VALUES
@@ -42,87 +63,94 @@ VALUES
         CAST(STRFTIME('%Y', 'now', 'localtime') AS INTEGER)
     );
 
--- Step 1: Get current user ID.
-SET
-    current_user_id=(
-        SELECT
-            username
-        FROM
-            sessions
-        WHERE
-            session_token=sqlpage.cookie ('session_token')
-    );
-
--- Step 1c: Update the 1RM estimate based on the performance of the first set
--- This uses the Epley formula to calculate a new estimated 1-Rep-Max.
+-- =============================================================================
+-- Step 2: Handle POST Requests (Saving a Workout)
+-- =============================================================================
+-- Step 2a: Update User Progression
+-- If the RPE was 8 or less, advance the user's progression step and update their 1RM or Max Reps estimate.
 UPDATE dimExercisePlan
 SET
-    current1rmEstimate=:weight_1*(1+(:reps_1/30.0))
+    currentStepNumber=CASE
+        WHEN :action='save_log'
+        AND CAST(COALESCE(:rpe_recorded, 0) AS REAL)<=8
+        AND currentStepNumber>=(
+            SELECT
+                MAX(stepNumber)
+            FROM
+                dimProgressionModelStep
+            WHERE
+                progressionModelId=dimExercisePlan.progressionModelId
+        ) THEN 1
+        WHEN :action='save_log'
+        AND CAST(COALESCE(:rpe_recorded, 0) AS REAL)<=8 THEN currentStepNumber+1
+        ELSE currentStepNumber
+    END,
+    -- Update 1RM for weight models
+    current1rmEstimate=CASE
+        WHEN :action='save_log'
+        AND CAST(COALESCE(:rpe_recorded, 0) AS REAL)<=8
+        AND (
+            SELECT
+                modelType
+            FROM
+                dimProgressionModel
+            WHERE
+                progressionModelId=dimExercisePlan.progressionModelId
+        )='weight' THEN
+        -- If it's the last step, add 5 lbs to the 1RM estimate
+        CASE
+            WHEN currentStepNumber>=(
+                SELECT
+                    MAX(stepNumber)
+                FROM
+                    dimProgressionModelStep
+                WHERE
+                    progressionModelId=dimExercisePlan.progressionModelId
+            ) THEN COALESCE(current1rmEstimate, :weight_1)+5
+            -- Otherwise, calculate a new 1RM from Set 1's performance
+            ELSE :weight_1*(1+(:reps_1/30.0))
+        END
+        ELSE current1rmEstimate
+    END,
+    -- Update Max Reps for rep-based models
+    currentMaxRepsEstimate=CASE
+        WHEN :action='save_log'
+        AND CAST(COALESCE(:rpe_recorded, 0) AS REAL)<=8
+        AND (
+            SELECT
+                modelType
+            FROM
+                dimProgressionModel
+            WHERE
+                progressionModelId=dimExercisePlan.progressionModelId
+        )='reps'
+        -- This simpler MAX function is cleaner and resolves the syntax error.
+        -- It also includes the current value to ensure we only ever increase the max.
+        THEN MAX(
+            COALESCE(currentMaxRepsEstimate, 0),
+            CAST(COALESCE(:reps_1, 0) AS INTEGER),
+            CAST(COALESCE(:reps_2, 0) AS INTEGER),
+            CAST(COALESCE(:reps_3, 0) AS INTEGER),
+            CAST(COALESCE(:reps_4, 0) AS INTEGER),
+            CAST(COALESCE(:reps_5, 0) AS INTEGER)
+        )
+        ELSE currentMaxRepsEstimate
+    END
 WHERE
     exercisePlanId=:exercise_plan_id
-    AND :action='save_log'
-    -- Only run the calculation if the RPE is 8 or lower
-    AND CAST(:rpe_recorded AS REAL)<=8
-    -- And ensure data for set 1 was actually submitted
-    AND :reps_1 IS NOT NULL
-    AND :reps_1!=''
-    AND :weight_1 IS NOT NULL
-    AND :weight_1!='';
+    AND :action='save_log';
 
--- Step 1d: Update Max Reps Estimate for Rep-Based Models
-UPDATE dimExercisePlan
-SET
-    currentMaxRepsEstimate=(
-        -- Use the simpler MAX() function, treating any empty values as 0
-        SELECT
-            MAX(
-                COALESCE(:reps_1, 0),
-                COALESCE(:reps_2, 0),
-                COALESCE(:reps_3, 0),
-                COALESCE(:reps_4, 0),
-                COALESCE(:reps_5, 0)
-            )
-    )
-WHERE
-    exercisePlanId=:exercise_plan_id
-    AND :action='save_log'
-    AND (
-        :rpe_recorded IS NULL
-        OR :rpe_recorded=''
-        OR CAST(:rpe_recorded AS REAL)<=8
-    )
-    -- Only update if this is a rep-based progression model
-    AND (
-        SELECT
-            modelType
-        FROM
-            dimProgressionModel
-        WHERE
-            progressionModelId=dimExercisePlan.progressionModelId
-    )='reps'
-    -- And only if the new rep max is greater than the old one
-    AND (
-        SELECT
-            MAX(
-                COALESCE(:reps_1, 0),
-                COALESCE(:reps_2, 0),
-                COALESCE(:reps_3, 0),
-                COALESCE(:reps_4, 0),
-                COALESCE(:reps_5, 0)
-            )
-    )>COALESCE(currentMaxRepsEstimate, 0);
-
--- Step 2: Handle the form submission to save the workout log.
--- This uses a "delete and replace" strategy for robustness.
--- First, delete all existing sets for this workout session.
+-- Step 2b: Delete Existing Sets (for Edits)
+-- Using the original_date_id ensures the correct record is removed, even if the date was changed.
 DELETE FROM factWorkoutHistory
 WHERE
     userId=:user_id
     AND exerciseId=:exercise_id
-    AND dateId=:date_id
-    AND :action='save_log';
+    AND dateId=:original_date_id
+    AND :action='save_log'
+    AND :original_date_id IS NOT NULL;
 
--- Then, insert the new sets from the form, ignoring any rows where reps or weight are blank.
+-- Step 2c: Insert New/Updated Sets
 INSERT INTO
     factWorkoutHistory (
         workoutHistoryId,
@@ -142,11 +170,11 @@ SELECT
     HEX(RANDOMBLOB(16)),
     :user_id,
     :exercise_id,
-    :date_id,
+    REPLACE(:date_id, '-', ''),
     NULLIF(:exercise_plan_id, ''),
     step_data.setNumber,
     step_data.reps,
-    step_data.weight,
+    COALESCE(step_data.weight, 0),
     :rpe_recorded,
     :notes_recorded,
     STRFTIME('%s', 'now'),
@@ -181,55 +209,28 @@ FROM
 WHERE
     :action='save_log'
     AND (
-        step_data.reps IS NOT NULL
+        step_data.reps IS NOT NULL -- The check for weight has been removed
         AND step_data.reps!=''
-    )
-    AND (
-        step_data.weight IS NOT NULL
-        AND step_data.weight!=''
     );
 
--- After saving the sets, handle the progression logic.
-UPDATE dimExercisePlan
-SET
-    -- Use a CASE statement to decide whether to increment the step or restart the cycle
-    currentStepNumber=CASE
-    -- If the current step is the last step in the model, reset to 1
-        WHEN currentStepNumber=(
-            SELECT
-                MAX(stepNumber)
-            FROM
-                dimProgressionModelStep
-            WHERE
-                progressionModelId=dimExercisePlan.progressionModelId
-        ) THEN 1
-        -- Otherwise, just increment the step number by 1
-        ELSE currentStepNumber+1
-    END,
-    -- Also update the 1RM estimate if the cycle is being restarted
-    current1rmEstimate=CASE
-    -- If the current step is the last step, add 5 lbs to the 1RM estimate
-        WHEN currentStepNumber=(
-            SELECT
-                MAX(stepNumber)
-            FROM
-                dimProgressionModelStep
-            WHERE
-                progressionModelId=dimExercisePlan.progressionModelId
-        ) THEN current1rmEstimate+5
-        -- Otherwise, keep the 1RM estimate the same
-        ELSE current1rmEstimate
-    END
+-- Step 2d: Redirect After Save
+SELECT
+    'redirect' as component,
+    CASE
+    -- If a template_id was passed, the user is logging a planned workout from the main page.
+        WHEN :template_id IS NOT NULL
+        AND :template_id!='' THEN '/index.sql?template_id='||:template_id
+        -- Otherwise, the user was editing a log from the history view. Return there.
+        ELSE '/views/view_history.sql?edited=true'
+    END as link
 WHERE
-    exercisePlanId=:exercise_plan_id
-    AND :action='save_log'
-    AND :rpe_recorded<=8;
+    :action='save_log';
 
 -- =============================================================================
--- Handle the delete request
+-- Step 3: Handle POST Requests (Deleting a Workout)
 -- =============================================================================
--- Step 2a: Before deleting, check if this workout caused a progression and revert it.
--- This block runs only if the submitted action is 'delete_log'.
+-- Step 3a: Revert Progression
+-- Before deleting, check if this workout caused a progression and revert it.
 UPDATE dimExercisePlan
 SET
     currentStepNumber=currentStepNumber - 1
@@ -260,7 +261,7 @@ WHERE
     )<=8
     AND :action='delete_log';
 
--- Step 2b: Delete all sets for this workout session.
+-- Step 3b: Delete Workout Log
 DELETE FROM factWorkoutHistory
 WHERE
     userId=:user_id
@@ -268,29 +269,22 @@ WHERE
     AND dateId=:date_id
     AND :action='delete_log';
 
--- Step 2c: After deleting, redirect back to the Training Log page.
+-- Step 3c: Redirect After Delete
 SELECT
     'redirect' as component,
     '/views/view_history.sql?deleted=true' as link
 WHERE
     :action='delete_log';
 
--- SELECT
---     'redirect' AS component,
---     -- Rebuild the URL to remember both the selected routine and exercise
---     '/index.sql?template_id='||:template_id||'&exercise_plan_id='||:exercise_plan_id AS link
--- WHERE
---     :action='manual_progression_update'
---     OR :action='save_log';
 -- =============================================================================
--- Page Rendering Logic (only runs on GET requests)
+-- Step 4: Page Rendering on GET Request
 -- =============================================================================
--- Step 3: Load the main layout.
+-- Step 4a: Load Main Layout
 SELECT
     'dynamic' AS component,
     sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
 
--- Step 4: Fetch data for the workout session if we are in "Edit" mode.
+-- Step 4b: Fetch Session Data for Editing
 SET
     workout_session_data=(
         SELECT
@@ -303,6 +297,8 @@ SET
                 fwh.exercisePlanId,
                 'rpe',
                 MAX(fwh.rpeRecorded),
+                'notes',
+                MAX(fwh.notes),
                 'sets',
                 JSON_GROUP_ARRAY(
                     JSON_OBJECT(
@@ -328,7 +324,7 @@ SET
             fwh.exercisePlanId
     );
 
--- Step 5: Display the page header.
+-- Step 4c: Display Page Header
 SELECT
     'text' as component,
     CASE
@@ -342,7 +338,7 @@ SELECT
 WHERE
     $user_id IS NOT NULL;
 
--- Step 6: Display the main form.
+-- Step 4d: Display Main Edit/Create Form
 SELECT
     'form' as component,
     'post' as method;
@@ -365,9 +361,23 @@ WHERE
     $user_id IS NOT NULL;
 
 SELECT
-    'hidden' as type,
+    'date' as type,
     'date_id' as name,
-    COALESCE($date_id, STRFTIME('%Y%m%d', 'now')) as value;
+    'Workout Date' as label,
+    'Choose the date of the workout.' as description,
+    COALESCE(
+        JSON_EXTRACT($workout_session_data, '$.fullDate'),
+        STRFTIME('%Y-%m-%d', 'now', 'localtime')
+    ) as value,
+    TRUE as required,
+    4 as width;
+
+SELECT
+    'hidden' as type,
+    'original_date_id' as name,
+    $date_id as value -- The $date_id from the URL holds the original date
+WHERE
+    $date_id IS NOT NULL;
 
 SELECT
     'hidden' as type,
@@ -499,9 +509,7 @@ SELECT
     'submit' as type,
     'Save Workout' as title;
 
--- =============================================================================
--- Display the Delete button (only in "Edit" mode)
--- =============================================================================
+-- Step 4e: Display Delete Form (only in "Edit" mode)
 SELECT
     'divider' as component
 WHERE

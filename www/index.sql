@@ -1,9 +1,10 @@
 /**
  * @filename      index.sql
  * @description   The main dashboard for logging workouts. Guides the user through selecting a routine and exercise,
- * then displays their targets and a form to log their performance.
- * @created       2025-07-07
- * @requires      - layouts/layout_main.sql, All dim tables, action_edit_history.sql
+ * displays a summary of their targets and previous performance, and provides forms to log their
+ * current workout and manually update their progression.
+ * @created       2025-07-09
+ * @requires      - layouts/layout_main.sql, All dim tables, action_edit_history.sql, action_update_progression.sql
  */
 -- =============================================================================
 -- Step 1: Initial Setup
@@ -66,7 +67,7 @@ SELECT
 SELECT
     'select' AS type,
     'template_id' AS name,
-    'Step 1: Select Your Routine' AS label,
+    'Step 1: Select Workout' AS label,
     'Select a Routine' AS empty_option,
     $template_id AS value,
     (
@@ -84,30 +85,18 @@ SELECT
                 WHERE
                     userId=$current_user_id
                     AND isActive=1
+                ORDER BY
+                    templateName
             )
-        ORDER BY
-            templateName
-    ) AS options;
+    ) AS options,
+    4 AS width;
 
--- =============================================================================
--- Step 2a: Display a dynamic, collapsible summary of the selected workout plan
--- =============================================================================
-SELECT
-    'select' AS type,
-    'exercise_plan_id' AS name,
-    'Step 2: Select Your Exercise' AS label,
-    'Select an Exercise' AS empty_option,
-    $exercise_plan_id AS value,
-    (
+WITH
+    SortedExercises AS (
+        -- First, create a temporary, sorted list of the exercises for the selected routine
         SELECT
-            JSON_GROUP_ARRAY(
-                JSON_OBJECT(
-                    'label',
-                    ex.exerciseName,
-                    'value',
-                    plan.exercisePlanId
-                )
-            )
+            ex.exerciseName,
+            plan.exercisePlanId
         FROM
             dimExercisePlan AS plan
             JOIN dimExercise AS ex ON plan.exerciseId=ex.exerciseId
@@ -115,12 +104,27 @@ SELECT
             plan.templateId=$template_id
             AND plan.userId=$current_user_id
         ORDER BY
-            ex.exerciseName
-    ) AS options;
+            TRIM(ex.exerciseName) COLLATE NOCASE
+    )
+SELECT
+    'select' AS type,
+    'exercise_plan_id' AS name,
+    'Step 2: Select Exercise' AS label,
+    'Select an Exercise' AS empty_option,
+    $exercise_plan_id AS value,
+    (
+        -- Then, build the JSON array from this pre-sorted list
+        SELECT
+            JSON_GROUP_ARRAY(
+                JSON_OBJECT('label', exerciseName, 'value', exercisePlanId)
+            )
+        FROM
+            SortedExercises
+    ) AS options,
+    4 as width;
 
 -- =============================================================================
--- Step 4: Workout Logging Form
--- This section appears only after both a routine and an exercise have been selected.
+-- Step 3: Data Preparation for Forms
 -- =============================================================================
 SET
     current_exercise_data=(
@@ -131,32 +135,36 @@ SET
                 'exerciseId',
                 plan.exerciseId,
                 'modelType',
-                model.modelType, -- Get the model type ('weight' or 'reps')
+                model.modelType,
                 'targetSets',
                 COALESCE(step.targetSets, 3),
                 'targetReps',
                 CASE -- If the model is rep-based, calculate target reps
-                    WHEN model.modelType='reps' THEN ROUND(
-                        plan.currentMaxRepsEstimate*(step.percentOfMax/100)
+                    WHEN model.modelType='reps' THEN CAST(
+                        ROUND(
+                            plan.currentMaxRepsEstimate*(step.percentOfMax/100.0)
+                        ) AS INTEGER
                     )
                     ELSE COALESCE(step.targetReps, 5) -- Otherwise, use the fixed target reps
                 END,
                 'targetWeight',
                 ROUND(
-                    COALESCE(:current_1rm, plan.current1rmEstimate, 0)*(COALESCE(step.percentOfMax, 0)/100),
+                    COALESCE(plan.current1rmEstimate, 0)*(COALESCE(step.percentOfMax, 0)/100.0),
                     1
                 ),
                 'currentStepNumber',
                 plan.currentStepNumber,
                 'current1rmEstimate',
-                plan.current1rmEstimate
+                plan.current1rmEstimate,
+                'currentMaxRepsEstimate',
+                plan.currentMaxRepsEstimate
             )
         FROM
             dimExercisePlan AS plan
             JOIN dimExercise AS ex ON plan.exerciseId=ex.exerciseId
             LEFT JOIN dimProgressionModel AS model ON plan.progressionModelId=model.progressionModelId
             LEFT JOIN dimProgressionModelStep AS step ON plan.progressionModelId=step.progressionModelId
-            AND step.stepNumber=COALESCE(:current_step, plan.currentStepNumber)
+            AND step.stepNumber=plan.currentStepNumber
         WHERE
             plan.exercisePlanId=$exercise_plan_id
     );
@@ -164,79 +172,175 @@ SET
 SELECT
     'html' as component;
 
--- This query builds the HTML for the workout summary.
--- It first gets all targets for the selected plan, then checks for any workouts
--- logged today, and finally constructs the HTML list.
+-- =============================================================================
+-- Step 4: Page Content and Summaries
+-- =============================================================================
 WITH
-    -- First, get all exercise targets for the selected workout plan.
     TemplateExercises AS (
         SELECT
             ex.exerciseName,
             plan.exerciseId,
+            model.modelType,
             COALESCE(step.targetSets, 3) as targetSets,
-            COALESCE(step.targetReps, 5) as targetReps,
+            -- This logic correctly calculates target reps for different model types
+            CASE
+                WHEN model.modelType='reps'
+                AND plan.currentMaxRepsEstimate IS NOT NULL
+                AND step.percentOfMax IS NOT NULL THEN CAST(
+                    ROUND(
+                        plan.currentMaxRepsEstimate*(step.percentOfMax/100.0)
+                    ) AS INTEGER
+                )
+                ELSE COALESCE(step.targetReps, 5)
+            END AS targetReps,
             -- Safely calculate the target weight
             ROUND(
-                COALESCE(plan.current1rmEstimate, 0)*(COALESCE(step.percentOfMax, 0)/100),
+                COALESCE(plan.current1rmEstimate, 0)*(COALESCE(step.percentOfMax, 0)/100.0),
                 1
             ) as targetWeight,
             plan.currentStepNumber
         FROM
             dimExercisePlan AS plan
             JOIN dimExercise AS ex ON plan.exerciseId=ex.exerciseId
+            LEFT JOIN dimProgressionModel AS model ON plan.progressionModelId=model.progressionModelId
             LEFT JOIN dimProgressionModelStep AS step ON plan.progressionModelId=step.progressionModelId
             AND plan.currentStepNumber=step.stepNumber
         WHERE
             plan.templateId=$template_id
             AND plan.userId=$current_user_id
     ),
-    -- Second, get the performance details for any exercises logged today.
+    -- Second, get the performance details for any exercises logged today, with summarization.
     PerformanceToday AS (
         SELECT
-            exerciseId,
-            GROUP_CONCAT(repsPerformed||'x'||weightUsed||'lbs', '; ') as performanceString
+            fwh.exerciseId,
+            CASE
+                WHEN MAX(model.modelType)='reps' THEN CASE
+                    WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)
+                    ELSE GROUP_CONCAT(CAST(fwh.repsPerformed AS TEXT), '; ')
+                END
+                WHEN MAX(fwh.exercisePlanId) IS NULL
+                AND MAX(fwh.weightUsed)=0 THEN CASE
+                    WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)
+                    ELSE GROUP_CONCAT(CAST(fwh.repsPerformed AS TEXT), '; ')
+                END
+                ELSE CASE
+                    WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed)
+                    AND MIN(fwh.weightUsed)=MAX(fwh.weightUsed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)||'x'||CAST(MIN(fwh.weightUsed) AS INTEGER)||' lbs'
+                    ELSE GROUP_CONCAT(
+                        fwh.repsPerformed||'x'||CAST(fwh.weightUsed AS INTEGER)||' lbs',
+                        '; '
+                    )
+                END
+            END as performanceString
         FROM
-            factWorkoutHistory
+            factWorkoutHistory AS fwh
+            LEFT JOIN dimExercisePlan AS plan ON fwh.exercisePlanId=plan.exercisePlanId
+            LEFT JOIN dimProgressionModel AS model ON plan.progressionModelId=model.progressionModelId
         WHERE
-            userId=$current_user_id
-            AND dateId=STRFTIME('%Y%m%d', 'now')
+            fwh.userId=$current_user_id
+            AND fwh.dateId=STRFTIME('%Y%m%d', 'now', 'localtime')
         GROUP BY
-            exerciseId
+            fwh.exerciseId
     )
-    -- Finally, join targets with today's performance and generate the final HTML list.
+    -- Finally, join targets with performance and generate the final HTML list.
 SELECT
-    -- If an exercise is already selected, keep the summary collapsed. Otherwise, open it by default.
     CASE
         WHEN $exercise_plan_id IS NOT NULL THEN '<details>'
         ELSE '<details open>'
     END||'<summary>Today''s Workout Targets</summary><div style="margin-top: 0.5rem; padding-left: 1rem; line-height: 1.7;">'||GROUP_CONCAT(
         CASE
-        -- If performance details exist for this exercise, show them with a green checkmark.
+        -- If performance details exist, show them with a green checkmark.
             WHEN perf.performanceString IS NOT NULL THEN FORMAT(
                 '<div style="color: green;">✅ %s &rarr; %s</div>',
                 ex.exerciseName,
                 perf.performanceString
             )
-            -- Otherwise, show the original target information.
-            ELSE FORMAT(
-                '<div>%s<br><small>&nbsp; &rarr; <b>Target:</b> %s x %s @ %s lbs</small></div>',
-                ex.exerciseName,
-                ex.targetSets,
-                ex.targetReps,
-                ex.targetWeight
-            )
+            -- Otherwise, show the correctly formatted target information.
+            ELSE CASE
+            -- If model is 'reps' or target weight is 0, use the simple format
+                WHEN ex.modelType='reps'
+                OR ex.targetWeight=0 THEN FORMAT(
+                    '<div>%s<small>&nbsp; &rarr; </b> %s x %s</small></div>',
+                    ex.exerciseName,
+                    ex.targetSets,
+                    ex.targetReps
+                )
+                -- Otherwise, use the format with weight
+                ELSE FORMAT(
+                    '<div>%s<small>&nbsp; &rarr; </b> %s x %s x %s lbs</small></div>',
+                    ex.exerciseName,
+                    ex.targetSets,
+                    ex.targetReps,
+                    CAST(ex.targetWeight AS INTEGER)
+                )
+            END
         END,
-        '' -- No separator, the <div> tags handle newlines
+        '' -- No separator
+        ORDER BY
+            ex.exerciseName
     )||'</div></details>' AS html
 FROM
     TemplateExercises AS ex
     LEFT JOIN PerformanceToday AS perf ON ex.exerciseId=perf.exerciseId
 WHERE
-    $template_id IS NOT NULL
-ORDER BY
-    ex.exerciseName;
+    $template_id IS NOT NULL;
 
--- Display the final form to log performance
+SET
+    last_workout_date_id=(
+        SELECT
+            MAX(fwh.dateId)
+        FROM
+            factWorkoutHistory AS fwh
+        WHERE
+            fwh.exerciseId=JSON_EXTRACT($current_exercise_data, '$.exerciseId')
+            AND fwh.userId=$current_user_id
+            AND fwh.dateId<STRFTIME('%Y%m%d', 'now', 'localtime')
+    );
+
+-- Only build the HTML component if a valid last workout date was found.
+SELECT
+    -- Use FORMAT to wrap the output in a styled div, creating a highlighted callout box
+    FORMAT(
+        '<div style="background-color: #e7f3ff; border-left: 5px solid #0d6efd; padding: 1rem; margin-bottom: 1rem; border-radius: 0.25rem;"><b>Previous Workout:</b><br/>On %s, you performed: <b>%s</b> with an RPE of <b>%s</b>.</div>',
+        d.fullDate,
+        -- Summarization logic for sets
+        CASE
+            WHEN MAX(model.modelType)='reps' THEN CASE
+                WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)
+                ELSE GROUP_CONCAT(CAST(fwh.repsPerformed AS TEXT), '; ')
+            END
+            WHEN MAX(fwh.exercisePlanId) IS NULL
+            AND MAX(fwh.weightUsed)=0 THEN CASE
+                WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)
+                ELSE GROUP_CONCAT(CAST(fwh.repsPerformed AS TEXT), '; ')
+            END
+            ELSE CASE
+                WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed)
+                AND MIN(fwh.weightUsed)=MAX(fwh.weightUsed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)||'x'||CAST(MIN(fwh.weightUsed) AS INTEGER)||' lbs'
+                ELSE GROUP_CONCAT(
+                    fwh.repsPerformed||'x'||CAST(fwh.weightUsed AS INTEGER)||' lbs',
+                    '; '
+                )
+            END
+        END,
+        MAX(fwh.rpeRecorded)
+    ) as html
+FROM
+    factWorkoutHistory AS fwh
+    JOIN dimDate AS d ON fwh.dateId=d.dateId
+    LEFT JOIN dimExercisePlan AS plan ON fwh.exercisePlanId=plan.exercisePlanId
+    LEFT JOIN dimProgressionModel AS model ON plan.progressionModelId=model.progressionModelId
+WHERE
+    fwh.dateId=$last_workout_date_id
+    AND fwh.exerciseId=JSON_EXTRACT($current_exercise_data, '$.exerciseId')
+    AND fwh.userId=$current_user_id
+    AND $last_workout_date_id IS NOT NULL -- This condition prevents the query from running if no history is found
+GROUP BY
+    d.fullDate;
+
+-- =============================================================================
+-- Step 5: Workout Logging Form
+-- =============================================================================
 SELECT
     'form' AS component,
     'post' AS method,
@@ -286,7 +390,8 @@ WITH RECURSIVE
         FROM
             series
         WHERE
-            set_number<(
+            $exercise_plan_id IS NOT NULL
+            and set_number<(
                 SELECT
                     CAST(
                         JSON_EXTRACT($current_exercise_data, '$.targetSets') AS INTEGER
@@ -305,6 +410,8 @@ SELECT
     NULL AS step
 FROM
     series
+WHERE
+    $exercise_plan_id IS NOT NULL
 UNION ALL
 -- 'Reps' input for each set, pre-filled with the target reps
 SELECT
@@ -318,6 +425,8 @@ SELECT
     0.01 AS step
 FROM
     series
+WHERE
+    $exercise_plan_id IS NOT NULL
 UNION ALL
 -- 'Weight' input for each set, pre-filled with the target weight
 SELECT
@@ -333,6 +442,7 @@ FROM
     series
 WHERE
     JSON_EXTRACT($current_exercise_data, '$.modelType')='weight'
+    and $exercise_plan_id IS NOT NULL
 ORDER BY
     set_number,
     type;
@@ -346,6 +456,8 @@ SELECT
     6 as width,
     '' as max,
     '' as step
+WHERE
+    $exercise_plan_id IS NOT NULL
 UNION ALL
 SELECT
     'number' as type,
@@ -356,6 +468,8 @@ SELECT
     3 as width,
     10 as max,
     0.01 as step
+WHERE
+    $exercise_plan_id IS NOT NULL
 UNION ALL
 SELECT
     'header' as type,
@@ -366,6 +480,8 @@ SELECT
     4 as width,
     '' as max,
     '' as step
+WHERE
+    $exercise_plan_id IS NOT NULL
 UNION ALL
 SELECT
     'textarea' as type,
@@ -375,17 +491,25 @@ SELECT
     '' as value,
     8 as width,
     '' as max,
-    '' as step;
+    '' as step
+WHERE
+    $exercise_plan_id IS NOT NULL;
 
+-- =============================================================================
+-- Step 6: Manual Progression Update Form
+-- =============================================================================
 SELECT
     'divider' as component,
-    'Manual Progression Update' as contents;
+    'Manual Progression Update' as contents
+WHERE
+    $exercise_plan_id IS NOT NULL;
 
 SELECT
     'text' as component,
     '1RM Calculation: Weight * (1 + (Reps / 30))' as contents_md
 WHERE
-    JSON_EXTRACT($current_exercise_data, '$.modelType')='weight';
+    JSON_EXTRACT($current_exercise_data, '$.modelType')='weight'
+    and $exercise_plan_id IS NOT NULL;
 
 SELECT
     'form' as component,
@@ -394,7 +518,8 @@ SELECT
     'Save Progression' as validate,
     'green' as validate_color
 WHERE
-    $exercise_plan_id IS NOT NULL;
+    $exercise_plan_id IS NOT NULL
+    and $exercise_plan_id IS NOT NULL;
 
 -- Hidden fields to identify the plan and the action
 SELECT
@@ -420,7 +545,9 @@ SELECT
     '' as label,
     JSON_EXTRACT($current_exercise_data, '$.currentStepNumber') as value,
     4 as width,
-    1 as step;
+    1 as step
+WHERE
+    $exercise_plan_id IS NOT NULL;
 
 -- Conditionally show the "Est. 1RM" input for WEIGHT based models
 SELECT
@@ -433,7 +560,8 @@ SELECT
     4 as width,
     0.5 as step
 WHERE
-    JSON_EXTRACT($current_exercise_data, '$.modelType')='weight';
+    JSON_EXTRACT($current_exercise_data, '$.modelType')='weight'
+    and $exercise_plan_id IS NOT NULL;
 
 -- Conditionally show the "Est. Max Reps" input for REP based models
 SELECT
@@ -452,7 +580,8 @@ SELECT
     4 as width,
     1 as step
 WHERE
-    JSON_EXTRACT($current_exercise_data, '$.modelType')='reps';
+    JSON_EXTRACT($current_exercise_data, '$.modelType')='reps'
+    and $exercise_plan_id IS NOT NULL;
 
 SELECT
     'redirect' AS component,

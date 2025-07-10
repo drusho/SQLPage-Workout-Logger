@@ -1,0 +1,14 @@
+table_name: sqlpage_files
+description: ADD A DESCRIPTION FOR THIS TABLE
+owner: NEEDS OWNER
+tags: []
+columns:
+- name: contents
+  description: ADD A DESCRIPTION FOR THIS COLUMN
+  tests: []
+- name: last_modified
+  description: ADD A DESCRIPTION FOR THIS COLUMN
+  tests: []
+- name: path
+  description: ADD A DESCRIPTION FOR THIS COLUMN
+  tests: []

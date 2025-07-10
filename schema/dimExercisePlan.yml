@@ -10,6 +10,9 @@ tags:
 columns:
 - name: current1rmEstimate
   description: The user's current estimated 1-Rep Max for this exercise.
+- name: currentMaxRepsEstimate
+  description: ADD A DESCRIPTION FOR THIS NEW COLUMN
+  tests: []
 - name: currentStepNumber
   description: The user's current step in the progression model for this exercise.
 - name: exerciseId
@@ -41,6 +44,9 @@ columns:
   description: The target number of reps for the current step.
 - name: targetSets
   description: The target number of sets for the current step.
+- name: templateId
+  description: ADD A DESCRIPTION FOR THIS NEW COLUMN
+  tests: []
 - name: templateName
   description: The default, global name of the workout template this plan originated
     from.

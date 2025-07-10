@@ -8,7 +8,10 @@
  * @returns       A UI page containing a searchable table of the user's workout history.
  * @see           - /actions/action_edit_history.sql: The page for editing a workout log.
  */
--- Step 1: Load the main layout and get the current user's ID.
+-- =============================================================================
+-- Step 1: Initial Setup
+-- =============================================================================
+-- Load the main layout and get the current user's ID
 SELECT
     'dynamic' AS component,
     sqlpage.run_sql ('layouts/layout_main.sql') AS properties;
@@ -23,7 +26,9 @@ SET
             session_token=sqlpage.cookie ('session_token')
     );
 
--- Step 2: Display the page header and "Add" button.
+-- =============================================================================
+-- Step 2: Page Header
+-- =============================================================================
 SELECT
     'text' as component,
     'Training Log' as title;
@@ -38,7 +43,9 @@ SELECT
     'Add Workout Log' as title,
     'plus' as icon;
 
--- Step 3: Display the workout history table for the current user.
+-- =============================================================================
+-- Step 3: Workout History Table
+-- =============================================================================
 SELECT
     'divider' as component;
 
@@ -51,14 +58,32 @@ SELECT
 
 SELECT
     d.fullDate AS "Date",
-    e.exerciseName AS "Exercise",
+    ex.exerciseName AS "Exercise",
     -- Aggregate all sets for the workout into a single summary string
-    CONCAT (
-        GROUP_CONCAT(
-            ' '||fwh.setNumber||'x'||fwh.repsPerformed||'@'||fwh.weightUsed
-        ),
-        ' rpe:'||fwh.rpeRecorded
-    ) AS "Sets",
+    CASE
+    -- First, handle calisthenics (reps-only) exercises
+        WHEN MAX(model.modelType)='reps' THEN CASE
+            WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)
+            ELSE GROUP_CONCAT(CAST(fwh.repsPerformed AS TEXT), ' | ')
+        END
+        -- Next, handle ad-hoc bodyweight exercises (no plan and weight is zero)
+        WHEN MAX(fwh.exercisePlanId) IS NULL
+        AND MAX(fwh.weightUsed)=0 THEN CASE
+            WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)
+            ELSE GROUP_CONCAT(CAST(fwh.repsPerformed AS TEXT), ' | ')
+        END
+        -- Finally, handle all weight-based exercises
+        ELSE CASE
+        -- If all sets are identical, summarize them
+            WHEN MIN(fwh.repsPerformed)=MAX(fwh.repsPerformed)
+            AND MIN(fwh.weightUsed)=MAX(fwh.weightUsed) THEN COUNT(fwh.workoutHistoryId)||'x'||MIN(fwh.repsPerformed)||'x'||CAST(MIN(fwh.weightUsed) AS INTEGER)||' lbs'
+            -- Otherwise, list each set individually
+            ELSE GROUP_CONCAT(
+                fwh.repsPerformed||'x'||CAST(fwh.weightUsed AS INTEGER)||' lbs',
+                ' | '
+            )
+        END
+    END as "Sets",
     fwh.notes AS "Notes",
     -- Generate the Edit link for each workout session
     FORMAT(
@@ -70,15 +95,16 @@ SELECT
 FROM
     factWorkoutHistory AS fwh
     JOIN dimDate AS d ON fwh.dateId=d.dateId
-    JOIN dimExercise AS e ON fwh.exerciseId=e.exerciseId
+    JOIN dimExercise AS ex ON fwh.exerciseId=ex.exerciseId
+    -- LEFT JOIN to plan and model, as not all history entries may have a plan (ad-hoc workouts)
+    LEFT JOIN dimExercisePlan AS plan ON fwh.exercisePlanId=plan.exercisePlanId
+    LEFT JOIN dimProgressionModel AS model ON plan.progressionModelId=model.progressionModelId
 WHERE
-    -- Only show workouts for the currently logged-in user.
     fwh.userId=$current_user_id
 GROUP BY
-    d.fullDate,
-    e.exerciseName,
+    d.dateId,
+    ex.exerciseName,
     fwh.userId,
-    fwh.exerciseId,
-    fwh.dateId
+    fwh.exerciseId
 ORDER BY
-    d.fullDate DESC;
+    d.dateId DESC;
